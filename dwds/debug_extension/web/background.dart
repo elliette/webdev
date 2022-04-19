@@ -410,6 +410,7 @@ Future<bool> _tryAttach(
     );
     successCompleter.complete(true);
   }));
+  consoleLog('try attach is done.');
   return successCompleter.future;
 }
 
@@ -432,20 +433,20 @@ Future<void> _startSseClient(
     if (authUri.scheme == 'wss') authUri = authUri.replace(scheme: 'https');
     var authUrl = authUri.toString();
     try {
-      var response = await HttpRequest.request(authUrl,
-          method: 'GET', withCredentials: true);
-      if (!response.responseText
-          .contains('Dart Debug Authentication Success!')) {
+      var response = await WorkerGlobalScope.instance.fetch(
+        authUrl,
+        {'credentials': 'include'},
+      );
+      // TODO: Might be able to handle this better by following example in 
+      // https://github.com/dart-lang/sdk/issues/48835#issuecomment-1103168062
+      final success = response.ok as bool;
+      if (!success) {
         throw Exception('Not authenticated.');
       }
     } catch (_) {
-      if (window.confirm(
-          'Authentication required.\n\nClick OK to authenticate then try again.')) {
-        // TODO(grouma) - see if we can get a callback on a successful auth
-        // and automatically reinitiate the dev workflow.
-        window.open(authUrl, 'Dart DevTools Authentication');
-        detach(Debuggee(tabId: currentTab.id), allowInterop(() {}));
-      }
+      alert(
+          'Authentication required.\n\n Open $authUrl to authenticate, then try again.');
+      detach(Debuggee(tabId: currentTab.id), allowInterop(() {}));
       return;
     }
   }
