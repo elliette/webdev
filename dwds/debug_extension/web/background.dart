@@ -91,7 +91,7 @@ enum DebuggerTrigger { extensionIcon, dartPanel, dwds }
 
 void main() {
   // Start debugging when a user clicks the Dart Debug Extension:
-  browserActionOnClickedAddListener(allowInterop((_) {
+  actionOnClickedAddListener(allowInterop((_) {
     _startDebugging(DebuggerTrigger.extensionIcon);
   }));
 
@@ -159,9 +159,6 @@ void main() {
   onFakeClick = allowInterop(() {
     _startDebugging(DebuggerTrigger.extensionIcon);
   });
-
-  /// This is how we determine the extension tab to connect to during E2E tests.
-  isDartDebugExtension = true;
 }
 
 // Gets the current tab, then attaches the debugger to it:
@@ -610,8 +607,8 @@ class Listener<T> {
   void Function(T value) onChange;
 }
 
-@JS('chrome.browserAction.onClicked.addListener')
-external void browserActionOnClickedAddListener(Function callback);
+@JS('chrome.action.onClicked.addListener')
+external void actionOnClickedAddListener(Function callback);
 
 @JS('chrome.debugger.sendCommand')
 external void sendCommand(
@@ -660,7 +657,7 @@ external void onMessageExternalAddListener(Function callback);
 @JS('chrome.runtime.onMessage.addListener')
 external void onMessageAddListener(Function callback);
 
-@JS('chrome.browserAction.setIcon')
+@JS('chrome.action.setIcon')
 external void setIcon(IconInfo iconInfo);
 
 @JS('chrome.runtime.sendMessage')
@@ -832,6 +829,3 @@ class DetachReason {}
 /// after the extension is loaded.
 @JS('fakeClick')
 external set onFakeClick(void Function() f);
-
-@JS('window.isDartDebugExtension')
-external set isDartDebugExtension(_);

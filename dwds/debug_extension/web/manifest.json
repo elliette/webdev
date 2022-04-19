@@ -3,21 +3,21 @@
     "version": "1.28",
     "minimum_chrome_version": "10.0",
     "devtools_page": "devtools.html",
-    "manifest_version": 2,
-    "browser_action": {
+    "manifest_version": 3,
+    "action": {
         "default_icon": "dart_grey.png"
     },
     "permissions": [
         "debugger",
         "tabs",
-        "webNavigation",
+        "webNavigation"
+    ],
+    "host_permissions": [
         "http://*/*",
         "https://*/*"
     ],
     "background": {
-        "scripts": [
-            "background.js"
-        ]
+        "service_worker":  "background.js"
     },
     "content_scripts": [
         {
