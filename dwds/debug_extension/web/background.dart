@@ -27,6 +27,8 @@ import 'package:pub_semver/pub_semver.dart';
 import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../chrome_api/api.dart';
+
 const _notADartAppAlert = 'No Dart application detected.'
     ' Are you trying to debug an application that includes a Chrome hosted app'
     ' (an application listed in chrome://apps)? If so, debugging is disabled.'
@@ -130,7 +132,7 @@ enum DebuggerTrigger { extensionIcon, dartPanel, dwds }
 
 void main() {
   // Start debugging when a user clicks the Dart Debug Extension:
-  browserActionOnClickedAddListener(allowInterop((_) {
+  ChromeBrowserAction.onClickedAddListener(allowInterop((_) {
     _startDebugging(DebuggerTrigger.extensionIcon);
   }));
 
@@ -598,14 +600,14 @@ void _updateIcon() {
 
     if (_tabIdToWarning.containsKey(tab.id)) {
       // Set the warning icon (red):
-      setIcon(IconInfo(path: 'dart_warning.png'));
+      ChromeBrowserAction.setIcon(IconInfo(path: 'dart_warning.png'));
     } else if (_debuggableTabs.contains(tab.id)) {
       // Set the debuggable icon (blue):
       _mostRecentDartTab = tab;
-      setIcon(IconInfo(path: 'dart.png'));
+      ChromeBrowserAction.setIcon(IconInfo(path: 'dart.png'));
     } else {
       // Set the default icon (grey):
-      setIcon(IconInfo(path: 'dart_grey.png'));
+      ChromeBrowserAction.setIcon(IconInfo(path: 'dart_grey.png'));
     }
   }));
 }
@@ -662,9 +664,6 @@ class Listener<T> {
   void Function(T value) onChange;
 }
 
-@JS('chrome.browserAction.onClicked.addListener')
-external void browserActionOnClickedAddListener(Function callback);
-
 @JS('chrome.debugger.sendCommand')
 external void sendCommand(
     Debuggee target, String method, Object? commandParams, Function callback);
@@ -712,8 +711,8 @@ external void onMessageExternalAddListener(Function callback);
 @JS('chrome.runtime.onMessage.addListener')
 external void onMessageAddListener(Function callback);
 
-@JS('chrome.browserAction.setIcon')
-external void setIcon(IconInfo iconInfo);
+// @JS('chrome.browserAction.setIcon')
+// external void setIcon(IconInfo iconInfo);
 
 @JS('chrome.runtime.sendMessage')
 external void sendMessage(
@@ -755,12 +754,12 @@ class RemoveInfo {
   external bool get isWindowClosing;
 }
 
-@JS()
-@anonymous
-class IconInfo {
-  external String get path;
-  external factory IconInfo({String path});
-}
+// @JS()
+// @anonymous
+// class IconInfo {
+//   external String get path;
+//   external factory IconInfo({String path});
+// }
 
 @JS()
 @anonymous

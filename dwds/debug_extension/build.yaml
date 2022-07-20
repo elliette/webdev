@@ -7,7 +7,8 @@ targets:
             - -O4 
             - --csp
         generate_for:
-          - web/background.dart
+          - chrome_api/**.dart
+          - web/**.dart
       extension|client_js_copy_builder:
         enabled: true
       
