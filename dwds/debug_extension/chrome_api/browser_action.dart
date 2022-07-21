@@ -7,6 +7,7 @@ library browser_action;
 
 import 'package:js/js.dart';
 
+@JS()
 class ChromeBrowserAction {
   @JS('chrome.browserAction.onClicked.addListener')
   external static void onClickedAddListener(Function callback);
