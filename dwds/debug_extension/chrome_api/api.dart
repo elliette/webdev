@@ -8,3 +8,4 @@ library api;
 import 'package:js/js.dart';
 
 export 'browser_action.dart';
+export 'debugger.dart';

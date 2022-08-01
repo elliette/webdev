@@ -141,14 +141,15 @@ void main() {
 
   // Attaches a debug session to the app when the extension receives a
   // Runtime.executionContextCreated event from Chrome:
-  addDebuggerListener(allowInterop(_maybeAttachDebugSession));
+  ChromeDebugger.onEventAddListener(allowInterop(_maybeAttachDebugSession));
 
   // When a Dart application tab is closed, detach the corresponding debug
   // session:
   tabsOnRemovedAddListener(allowInterop(_removeAndDetachDebugSessionForTab));
 
   // When a debug session is detached, remove the reference to it:
-  onDetachAddListener(allowInterop((Debuggee source, DetachReason reason) {
+  ChromeDebugger.onDetachAddListener(
+      allowInterop((Debuggee source, DetachReason reason) {
     _removeDebugSessionForTab(source.tabId);
   }));
 
@@ -156,7 +157,7 @@ void main() {
   tabsOnCreatedAddListener(allowInterop(_maybeSaveDevToolsTabId));
 
   // Forward debugger events to the backend if applicable.
-  addDebuggerListener(allowInterop(_filterAndForwardToBackend));
+  ChromeDebugger.onEventAddListener(allowInterop(_filterAndForwardToBackend));
 
   // Maybe update the extension icon when a user clicks the tab:
   tabsOnActivatedAddListener(allowInterop((ActiveInfo info) {
@@ -168,7 +169,8 @@ void main() {
       allowInterop(_handleMessageFromExternalExtensions));
 
   // Message forwarder enabling communication with external Chrome extensions:
-  addDebuggerListener(allowInterop(_forwardMessageToExternalExtensions));
+  ChromeDebugger.onEventAddListener(
+      allowInterop(_forwardMessageToExternalExtensions));
 
   // Maybe update the extension icon when the window focus changes:
   windowOnFocusChangeAddListener(allowInterop((_) {
@@ -241,7 +243,8 @@ void _attachDebuggerToTab(Tab currentTab) async {
     return;
   }
 
-  attach(Debuggee(tabId: currentTab.id), '1.3', allowInterop(() async {
+  ChromeDebugger.attach(Debuggee(tabId: currentTab.id), '1.3',
+      allowInterop(() async {
     if (lastError != null) {
       String alertMessage;
       if (lastError!.message.contains('Cannot access') ||
@@ -254,8 +257,8 @@ void _attachDebuggerToTab(Tab currentTab) async {
       return;
     }
     _tabsToAttach.add(currentTab);
-    sendCommand(Debuggee(tabId: currentTab.id), 'Runtime.enable', EmptyParam(),
-        allowInterop((e) {}));
+    ChromeDebugger.sendCommand(Debuggee(tabId: currentTab.id), 'Runtime.enable',
+        EmptyParam(), allowInterop((e) {}));
   }));
 }
 
@@ -324,7 +327,7 @@ void _removeAndDetachDebugSessionForTab(int tabId, _) {
   final removedTabId = _removeDebugSessionForTab(tabId);
 
   if (removedTabId != -1) {
-    detach(Debuggee(tabId: removedTabId), allowInterop(() {}));
+    ChromeDebugger.detach(Debuggee(tabId: removedTabId), allowInterop(() {}));
   }
 }
 
@@ -380,7 +383,7 @@ void _handleMessageFromExternalExtensions(
         }
       }
 
-      sendCommand(Debuggee(tabId: request.tabId), options.method,
+      ChromeDebugger.sendCommand(Debuggee(tabId: request.tabId), options.method,
           options.commandParams, allowInterop(sendResponseOrError));
     } catch (e) {
       sendResponse(ErrorResponse()..error = '$e');
@@ -434,7 +437,7 @@ void sendMessageToExtensions(Request request) {
 Future<bool> _tryAttach(
     int contextId, Tab tab, bool launchInChromeDevTools) async {
   final successCompleter = Completer<bool>();
-  sendCommand(
+  ChromeDebugger.sendCommand(
       Debuggee(tabId: tab.id),
       'Runtime.evaluate',
       InjectedParams(
@@ -498,7 +501,8 @@ Future<void> _startSseClient(
         // TODO(grouma) - see if we can get a callback on a successful auth
         // and automatically reinitiate the dev workflow.
         window.open(authUrl, 'Dart DevTools Authentication');
-        detach(Debuggee(tabId: currentTab.id), allowInterop(() {}));
+        ChromeDebugger.detach(
+            Debuggee(tabId: currentTab.id), allowInterop(() {}));
       }
       return;
     }
@@ -518,8 +522,8 @@ Future<void> _startSseClient(
       final messageParams = message.commandParams ?? '{}';
       final params =
           BuiltMap<String, Object>(json.decode(messageParams)).toMap();
-      sendCommand(Debuggee(tabId: currentTab.id), message.command,
-          js_util.jsify(params), allowInterop(([e]) {
+      ChromeDebugger.sendCommand(Debuggee(tabId: currentTab.id),
+          message.command, js_util.jsify(params), allowInterop(([e]) {
         // No arguments indicate that an error occurred.
         if (e == null) {
           client.sink
@@ -567,8 +571,8 @@ Future<void> _startSseClient(
     ..tabUrl = currentTab.url
     ..uriOnly = launchInChromeDevTools))));
 
-  sendCommand(Debuggee(tabId: currentTab.id), 'Runtime.enable', EmptyParam(),
-      allowInterop((e) {}));
+  ChromeDebugger.sendCommand(Debuggee(tabId: currentTab.id), 'Runtime.enable',
+      EmptyParam(), allowInterop((e) {}));
 }
 
 void _updateOrCreateDevToolsPanel(
@@ -664,23 +668,6 @@ class Listener<T> {
   void Function(T value) onChange;
 }
 
-@JS('chrome.debugger.sendCommand')
-external void sendCommand(
-    Debuggee target, String method, Object? commandParams, Function callback);
-
-@JS('chrome.debugger.attach')
-external void attach(
-    Debuggee target, String requiredVersion, Function callback);
-
-@JS('chrome.debugger.detach')
-external void detach(Debuggee target, Function callback);
-
-@JS('chrome.debugger.onEvent.addListener')
-external dynamic addDebuggerListener(Function callback);
-
-@JS('chrome.debugger.onDetach.addListener')
-external dynamic onDetachAddListener(Function callback);
-
 @JS('chrome.tabs.query')
 external List<Tab> queryTabs(QueryInfo queryInfo, Function callback);
 
@@ -710,9 +697,6 @@ external void onMessageExternalAddListener(Function callback);
 
 @JS('chrome.runtime.onMessage.addListener')
 external void onMessageAddListener(Function callback);
-
-// @JS('chrome.browserAction.setIcon')
-// external void setIcon(IconInfo iconInfo);
 
 @JS('chrome.runtime.sendMessage')
 external void sendMessage(
@@ -752,22 +736,6 @@ class QueryInfo {
 class RemoveInfo {
   external int get windowId;
   external bool get isWindowClosing;
-}
-
-// @JS()
-// @anonymous
-// class IconInfo {
-//   external String get path;
-//   external factory IconInfo({String path});
-// }
-
-@JS()
-@anonymous
-class Debuggee {
-  external int get tabId;
-  external String get extensionId;
-  external String get targetId;
-  external factory Debuggee({int tabId, String? extensionId, String? targetId});
 }
 
 @JS()
@@ -822,13 +790,6 @@ class DebugEvent {
 @JS()
 @anonymous
 class RequestOptions {}
-
-@JS()
-@anonymous
-class SendCommandOptions {
-  external String get method;
-  external Object get commandParams;
-}
 
 @JS()
 @anonymous
