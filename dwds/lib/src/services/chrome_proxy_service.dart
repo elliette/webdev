@@ -42,9 +42,13 @@ class ChromeProxyService implements VmServiceInterface {
   /// are dynamic and roughly map to chrome tabs.
   final VM _vm;
 
-  /// Signals when isolate is intialized.
+  /// Signals when isolate is initialized.
   Future<void> get isInitialized => _initializedCompleter.future;
   Completer<void> _initializedCompleter = Completer<void>();
+
+  /// Signals when isolate starts.
+  Future<void> get isStarted => _startedCompleter.future;
+  Completer<void> _startedCompleter = Completer<void>();
 
   /// Signals when expression compiler is ready to evaluate.
   Future<void> get isCompilerInitialized => _compilerCompleter.future;
@@ -165,12 +169,12 @@ class ChromeProxyService implements VmServiceInterface {
     return service;
   }
 
-  /// Initializes metdata in [Locations], [Modules], and [ExpressionCompiler].
+  /// Initializes metadata in [Locations], [Modules], and [ExpressionCompiler].
   Future<void> _initializeEntrypoint(String entrypoint) async {
     _locations.initialize(entrypoint);
     _modules.initialize(entrypoint);
     _skipLists.initialize();
-    // We do not need to wait for compiler dependencies to be udpated as the
+    // We do not need to wait for compiler dependencies to be updated as the
     // [ExpressionEvaluator] is robust to evaluation requests during updates.
     unawaited(_updateCompilerDependencies(entrypoint));
   }
@@ -211,7 +215,7 @@ class ChromeProxyService implements VmServiceInterface {
     }
     // Waiting for the debugger to be ready before initializing the entrypoint.
     //
-    // Note: moving `await debugger` after the `_initalizeEntryPoint` call
+    // Note: moving `await debugger` after the `_initializeEntryPoint` call
     // causes `getcwd` system calls to fail. Since that system call is used
     // in first `Uri.base` call in the expression compiler service isolate,
     // the expression compiler service will fail to start.
@@ -252,6 +256,7 @@ class ChromeProxyService implements VmServiceInterface {
 
     unawaited(appConnection.onStart.then((_) async {
       await debugger.resumeFromStart();
+      _startedCompleter.complete();
     }));
 
     final isolateRef = inspector.isolateRef;
@@ -301,6 +306,7 @@ class ChromeProxyService implements VmServiceInterface {
     final isolateRef = inspector.isolateRef;
 
     _initializedCompleter = Completer<void>();
+    _startedCompleter = Completer<void>();
     _compilerCompleter = Completer<void>();
     _streamNotify(
         'Isolate',
@@ -573,12 +579,13 @@ ${globalLoadStrategy.loadModuleSnippet}("dart_sdk").developer.invokeExtension(
 
   /// Returns the current stack.
   ///
-  /// Returns null if the corresponding isolate is not paused.
+  /// Throws RPCError the corresponding isolate is not paused.
   ///
   /// The returned stack will contain up to [limit] frames if provided.
   @override
   Future<Stack> getStack(String isolateId, {int? limit}) async {
     await isInitialized;
+    await isStarted;
     _checkIsolate('getStack', isolateId);
     return (await debuggerFuture).getStack(limit: limit);
   }
@@ -718,6 +725,7 @@ ${globalLoadStrategy.loadModuleSnippet}("dart_sdk").developer.invokeExtension(
     if (inspector.appConnection.isStarted) {
       return captureElapsedTime(() async {
         await isInitialized;
+        await isStarted;
         _checkIsolate('resume', isolateId);
         return await (await debuggerFuture)
             .resume(step: step, frameIndex: frameIndex);

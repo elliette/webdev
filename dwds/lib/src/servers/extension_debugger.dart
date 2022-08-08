@@ -46,10 +46,10 @@ class ExtensionDebugger implements RemoteDebugger {
 
   Stream<WipEvent> get onNotification => _notificationController.stream;
 
-  final _closeController = StreamController<WipEvent>.broadcast();
+  final _closeController = StreamController<Object>.broadcast();
 
   @override
-  Stream<WipEvent> get onClose => _closeController.stream;
+  Stream<Object> get onClose => _closeController.stream;
 
   @override
   Stream<ConsoleAPIEvent> get onConsoleAPICalled => eventStream(
@@ -153,7 +153,7 @@ class ExtensionDebugger implements RemoteDebugger {
 
   @override
   void close() => _closed ??= () {
-        _closeController.add(WipEvent({}));
+        _closeController.add({});
         return Future.wait([
           sseConnection.sink.close(),
           _notificationController.close(),
@@ -304,7 +304,7 @@ class ExtensionDebugger implements RemoteDebugger {
 
   Map<String, dynamic> _validateResult(Map<String, dynamic>? result) {
     if (result == null) {
-      throw ChromeDebugException({'result': null});
+      throw ChromeDebugException({'text': 'null result from Chrome Devtools'});
     }
     if (result.containsKey('exceptionDetails')) {
       throw ChromeDebugException(

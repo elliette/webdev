@@ -2,8 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-// @dart = 2.9
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -56,45 +54,56 @@ enum IndexBaseMode { noBase, base }
 enum NullSafety { weak, sound }
 
 class TestContext {
-  String appUrl;
-  WipConnection tabConnection;
-  WipConnection extensionConnection;
-  TestServer testServer;
-  BuildDaemonClient daemonClient;
-  ResidentWebRunner webRunner;
-  WebDriver webDriver;
-  Process chromeDriver;
-  AppConnection appConnection;
-  DebugConnection debugConnection;
-  WebkitDebugger webkitDebugger;
-  Client client;
-  ExpressionCompilerService ddcService;
-  int port;
-  Directory _outputDir;
-  File _entryFile;
-  Uri _packageConfigFile;
-  Uri _projectDirectory;
-  String _entryContents;
+  String get appUrl => _appUrl!;
+  late String? _appUrl;
 
-  /// Null safety mode for the frontend server.
-  ///
-  /// Note: flutter's frontend server is always launched with
-  /// the null safety setting inferred from project configurations
-  /// or the source code. We skip this inference and just set it
-  /// here to the desired value manually.
-  ///
-  /// Note: build_runner-based setups ignore this setting and read
-  /// this value from the ddc debug metadata and pass it to the
-  /// expression compiler worker initialiation API.
-  ///
-  /// TODO(annagrin): Currently setting sound null safety for frontend
-  /// server tests fails due to missing sound SDK JavaScript and maps.
-  /// Issue: https://github.com/dart-lang/webdev/issues/1591
-  NullSafety nullSafety;
+  WipConnection get tabConnection => _tabConnection!;
+  late WipConnection? _tabConnection;
+
+  TestServer get testServer => _testServer!;
+  TestServer? _testServer;
+
+  BuildDaemonClient get daemonClient => _daemonClient!;
+  BuildDaemonClient? _daemonClient;
+
+  ResidentWebRunner get webRunner => _webRunner!;
+  ResidentWebRunner? _webRunner;
+
+  WebDriver get webDriver => _webDriver!;
+  WebDriver? _webDriver;
+
+  Process get chromeDriver => _chromeDriver!;
+  late Process? _chromeDriver;
+
+  WebkitDebugger get webkitDebugger => _webkitDebugger!;
+  late WebkitDebugger? _webkitDebugger;
+
+  Handler get assetHandler => _assetHandler!;
+  late Handler? _assetHandler;
+
+  Client get client => _client!;
+  late Client? _client;
+
+  ExpressionCompilerService? ddcService;
+
+  int get port => _port!;
+  late int? _port;
+
+  Directory get outputDir => _outputDir!;
+  late Directory? _outputDir;
+
+  late WipConnection extensionConnection;
+  late AppConnection appConnection;
+  late DebugConnection debugConnection;
+  late File _entryFile;
+  late Uri _packageConfigFile;
+  late Uri _projectDirectory;
+  late String _entryContents;
+
   final _logger = logging.Logger('Context');
 
   /// Top level directory in which we run the test server..
-  String workingDirectory;
+  late String workingDirectory;
 
   /// The path to build and serve.
   String pathToServe;
@@ -103,8 +112,8 @@ class TestContext {
   String path;
 
   TestContext(
-      {String directory,
-      String entry,
+      {String? directory,
+      String? entry,
       this.path = 'hello_world/index.html',
       this.pathToServe = 'example'}) {
     final relativeDirectory = p.join('..', 'fixtures', '_test');
@@ -135,40 +144,28 @@ class TestContext {
   }
 
   Future<void> setUp({
-    ReloadConfiguration reloadConfiguration,
-    bool serveDevTools,
-    bool enableDebugExtension,
-    bool autoRun,
-    bool enableDebugging,
-    bool useSse,
-    bool spawnDds,
-    String hostname,
-    bool waitToDebug,
-    UrlEncoder urlEncoder,
-    bool restoreBreakpoints,
-    CompilationMode compilationMode,
-    NullSafety nullSafety,
-    bool enableExpressionEvaluation,
-    bool verboseCompiler,
-    SdkConfigurationProvider sdkConfigurationProvider,
+    ReloadConfiguration reloadConfiguration = ReloadConfiguration.none,
+    bool serveDevTools = false,
+    bool enableDebugExtension = false,
+    bool autoRun = true,
+    bool enableDebugging = true,
+    bool useSse = true,
+    bool spawnDds = true,
+    String hostname = 'localhost',
+    bool waitToDebug = false,
+    UrlEncoder? urlEncoder,
+    CompilationMode compilationMode = CompilationMode.buildDaemon,
+    NullSafety nullSafety = NullSafety.weak,
+    bool enableExpressionEvaluation = false,
+    bool verboseCompiler = false,
+    SdkConfigurationProvider? sdkConfigurationProvider,
   }) async {
-    reloadConfiguration ??= ReloadConfiguration.none;
-    serveDevTools ??= false;
-    enableDebugExtension ??= false;
-    autoRun ??= true;
-    enableDebugging ??= true;
-    waitToDebug ??= false;
-    compilationMode ??= CompilationMode.buildDaemon;
-    enableExpressionEvaluation ??= false;
-    spawnDds ??= true;
-    verboseCompiler ??= false;
     sdkConfigurationProvider ??= DefaultSdkConfigurationProvider();
-    nullSafety ??= NullSafety.weak;
 
     try {
       configureLogWriter();
 
-      client = IOClient(HttpClient()
+      _client = IOClient(HttpClient()
         ..maxConnectionsPerHost = 200
         ..idleTimeout = const Duration(seconds: 30)
         ..connectionTimeout = const Duration(seconds: 30));
@@ -179,7 +176,7 @@ class TestContext {
       final chromeDriverPort = await findUnusedPort();
       final chromeDriverUrlBase = 'wd/hub';
       try {
-        chromeDriver = await Process.start('chromedriver$_exeExt',
+        _chromeDriver = await Process.start('chromedriver$_exeExt',
             ['--port=$chromeDriverPort', '--url-base=$chromeDriverUrlBase']);
         // On windows this takes a while to boot up, wait for the first line
         // of stdout as a signal that it is ready.
@@ -207,14 +204,13 @@ class TestContext {
       await Process.run(dartPath, ['pub', 'upgrade'],
           workingDirectory: workingDirectory);
 
-      ExpressionCompiler expressionCompiler;
+      ExpressionCompiler? expressionCompiler;
       AssetReader assetReader;
-      Handler assetHandler;
       Stream<BuildResults> buildResults;
       RequireStrategy requireStrategy;
       String basePath = '';
 
-      port = await findUnusedPort();
+      _port = await findUnusedPort();
       switch (compilationMode) {
         case CompilationMode.buildDaemon:
           {
@@ -225,7 +221,7 @@ class TestContext {
               ],
               '--verbose',
             ];
-            daemonClient =
+            _daemonClient =
                 await connectClient(workingDirectory, options, (log) {
               final record = log.toLogRecord();
               final name =
@@ -243,7 +239,7 @@ class TestContext {
                 .timeout(const Duration(seconds: 60));
 
             final assetServerPort = daemonPort(workingDirectory);
-            assetHandler = proxyHandler(
+            _assetHandler = proxyHandler(
                 'http://localhost:$assetServerPort/$pathToServe/',
                 client: client);
             assetReader =
@@ -275,14 +271,14 @@ class TestContext {
             final entry = p.toUri(_entryFile.path
                 .substring(_projectDirectory.toFilePath().length + 1));
 
-            webRunner = ResidentWebRunner(
+            _webRunner = ResidentWebRunner(
               entry,
               urlEncoder,
               _projectDirectory,
               _packageConfigFile,
               [_projectDirectory],
               'org-dartlang-app',
-              _outputDir.path,
+              outputDir.path,
               nullSafety == NullSafety.sound,
               verboseCompiler,
             );
@@ -297,7 +293,7 @@ class TestContext {
 
             basePath = webRunner.devFS.assetServer.basePath;
             assetReader = webRunner.devFS.assetServer;
-            assetHandler = webRunner.devFS.assetServer.handleRequest;
+            _assetHandler = webRunner.devFS.assetServer.handleRequest;
 
             requireStrategy = FrontendServerRequireStrategyProvider(
                     reloadConfiguration, assetReader, () async => {}, basePath)
@@ -327,14 +323,14 @@ class TestContext {
             ]
           }
         });
-      webDriver = await createDriver(
+      _webDriver = await createDriver(
           spec: WebDriverSpec.JsonWire,
           desired: capabilities,
           uri: Uri.parse(
               'http://127.0.0.1:$chromeDriverPort/$chromeDriverUrlBase/'));
       final connection = ChromeConnection('localhost', debugPort);
 
-      testServer = await TestServer.start(
+      _testServer = await TestServer.start(
         hostname,
         port,
         assetHandler,
@@ -349,21 +345,24 @@ class TestContext {
         enableDebugging,
         useSse,
         urlEncoder,
-        restoreBreakpoints,
         expressionCompiler,
         spawnDds,
         ddcService,
       );
 
-      appUrl = basePath.isEmpty
+      _appUrl = basePath.isEmpty
           ? 'http://localhost:$port/$path'
           : 'http://localhost:$port/$basePath/$path';
 
-      await webDriver.get(appUrl);
+      await _webDriver?.get(appUrl);
       final tab = await connection.getTab((t) => t.url == appUrl);
-      tabConnection = await tab.connect();
-      await tabConnection.runtime.enable();
-      await tabConnection.debugger.enable();
+      if (tab != null) {
+        _tabConnection = await tab.connect();
+        await tabConnection.runtime.enable();
+        await tabConnection.debugger.enable();
+      } else {
+        throw StateError('Unable to connect to tab.');
+      }
 
       if (enableDebugExtension) {
         final extensionTab = await _fetchDartDebugExtensionTab(connection);
@@ -383,30 +382,30 @@ class TestContext {
 
   Future<void> startDebugging() async {
     debugConnection = await testServer.dwds.debugConnection(appConnection);
-    webkitDebugger = WebkitDebugger(WipDebugger(tabConnection));
+    _webkitDebugger = WebkitDebugger(WipDebugger(tabConnection));
   }
 
   Future<void> tearDown() async {
-    await webDriver?.quit(closeSession: true);
-    chromeDriver?.kill();
+    await _webDriver?.quit(closeSession: true);
+    _chromeDriver?.kill();
     DartUri.currentDirectory = p.current;
     _entryFile.writeAsStringSync(_entryContents);
-    await daemonClient?.close();
+    await _daemonClient?.close();
     await ddcService?.stop();
-    await webRunner?.stop();
-    await testServer?.stop();
-    client?.close();
+    await _webRunner?.stop();
+    await _testServer?.stop();
+    _client?.close();
     await _outputDir?.delete(recursive: true);
     stopLogWriter();
 
     // clear the state for next setup
-    webDriver = null;
-    chromeDriver = null;
-    daemonClient = null;
+    _webDriver = null;
+    _chromeDriver = null;
+    _daemonClient = null;
     ddcService = null;
-    webRunner = null;
-    testServer = null;
-    client = null;
+    _webRunner = null;
+    _testServer = null;
+    _client = null;
     _outputDir = null;
   }
 
@@ -415,7 +414,7 @@ class TestContext {
         _entryContents.replaceAll('Hello World!', 'Gary is awesome!'));
 
     // Wait for the build.
-    await daemonClient.buildResults.firstWhere((results) => results.results
+    await _daemonClient?.buildResults.firstWhere((results) => results.results
         .any((result) => result.status == BuildStatus.succeeded));
 
     // Allow change to propagate to the browser.
@@ -451,8 +450,8 @@ class TestContext {
   Future<int> findBreakpointLine(
       String breakpointId, String isolateId, ScriptRef scriptRef) async {
     final script = await debugConnection.vmService
-        .getObject(isolateId, scriptRef.id) as Script;
-    final lines = LineSplitter.split(script.source).toList();
+        .getObject(isolateId, scriptRef.id!) as Script;
+    final lines = LineSplitter.split(script.source!).toList();
     final lineNumber =
         lines.indexWhere((l) => l.endsWith('// Breakpoint: $breakpointId'));
     if (lineNumber == -1) {
