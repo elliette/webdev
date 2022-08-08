@@ -1,7 +1,7 @@
 targets:
   $default:
     sources:
-      - chrome_api/**
+      - web_api/**
       - lib/**
       - web/**
       - pubspec.*
@@ -13,7 +13,7 @@ targets:
             - -O4 
             - --csp
         generate_for:
-          - chrome_api/**.dart
+          - web_api/**.dart
           - web/**.dart
       extension|client_js_copy_builder:
         enabled: true

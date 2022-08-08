@@ -7,5 +7,5 @@ library api;
 
 import 'package:js/js.dart';
 
-export 'browser_action.dart';
-export 'debugger.dart';
+export 'chrome_browser_action.dart';
+export 'chrome_debugger.dart';

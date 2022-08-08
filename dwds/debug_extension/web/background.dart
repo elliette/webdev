@@ -27,7 +27,7 @@ import 'package:pub_semver/pub_semver.dart';
 import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../chrome_api/api.dart';
+import '../web_api/api.dart';
 
 const _notADartAppAlert = 'No Dart application detected.'
     ' Are you trying to debug an application that includes a Chrome hosted app'
