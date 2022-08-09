@@ -4,24 +4,30 @@
 
 import 'package:js/js.dart';
 
-@JS()
+@JS('chrome.debugger')
 class ChromeDebugger {
-  @JS('chrome.debugger.attach')
+  @JS('attach')
   external static void attach(
       Debuggee target, String requiredVersion, Function callback);
 
-  @JS('chrome.debugger.detach')
+  @JS('detach')
   external static void detach(Debuggee target, Function callback);
 
-  @JS('chrome.debugger.onDetach.addListener')
-  external static dynamic onDetachAddListener(Function callback);
-
-  @JS('chrome.debugger.onEvent.addListener')
-  external static dynamic onEventAddListener(Function callback);
-
-  @JS('chrome.debugger.sendCommand')
+  @JS('sendCommand')
   external static void sendCommand(
       Debuggee target, String method, Object? commandParams, Function callback);
+}
+
+@JS('chrome.debugger.onDetach')
+class ChromeDebuggerOnDetach {
+  @JS('addListener')
+  external static dynamic addListener(Function callback);
+}
+
+@JS('chrome.debugger.onEvent')
+class ChromeDebuggerOnEvent {
+  @JS('addListener')
+  external static dynamic addListener(Function callback);
 }
 
 @JS()

@@ -4,13 +4,16 @@
 
 import 'package:js/js.dart';
 
-@JS()
+@JS('chrome.browserAction')
 class ChromeBrowserAction {
-  @JS('chrome.browserAction.onClicked.addListener')
-  external static void onClickedAddListener(Function callback);
-
-  @JS('chrome.browserAction.setIcon')
+  @JS('setIcon')
   external static void setIcon(IconInfo iconInfo);
+}
+
+@JS('chrome.browserAction.onClicked')
+class ChromeBrowserActionOnClicked {
+  @JS('addListener')
+  external static void addListener(Function callback);
 }
 
 @JS()

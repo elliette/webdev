@@ -132,7 +132,7 @@ enum DebuggerTrigger { extensionIcon, dartPanel, dwds }
 
 void main() {
   // Start debugging when a user clicks the Dart Debug Extension:
-  ChromeBrowserAction.onClickedAddListener(allowInterop((_) {
+  ChromeBrowserActionOnClicked.addListener(allowInterop((_) {
     _startDebugging(DebuggerTrigger.extensionIcon);
   }));
 
@@ -141,14 +141,14 @@ void main() {
 
   // Attaches a debug session to the app when the extension receives a
   // Runtime.executionContextCreated event from Chrome:
-  ChromeDebugger.onEventAddListener(allowInterop(_maybeAttachDebugSession));
+  ChromeDebuggerOnEvent.addListener(allowInterop(_maybeAttachDebugSession));
 
   // When a Dart application tab is closed, detach the corresponding debug
   // session:
   tabsOnRemovedAddListener(allowInterop(_removeAndDetachDebugSessionForTab));
 
   // When a debug session is detached, remove the reference to it:
-  ChromeDebugger.onDetachAddListener(
+  ChromeDebuggerOnDetach.addListener(
       allowInterop((Debuggee source, DetachReason reason) {
     _removeDebugSessionForTab(source.tabId);
   }));
@@ -157,7 +157,7 @@ void main() {
   tabsOnCreatedAddListener(allowInterop(_maybeSaveDevToolsTabId));
 
   // Forward debugger events to the backend if applicable.
-  ChromeDebugger.onEventAddListener(allowInterop(_filterAndForwardToBackend));
+  ChromeDebuggerOnEvent.addListener(allowInterop(_filterAndForwardToBackend));
 
   // Maybe update the extension icon when a user clicks the tab:
   tabsOnActivatedAddListener(allowInterop((ActiveInfo info) {
@@ -169,7 +169,7 @@ void main() {
       allowInterop(_handleMessageFromExternalExtensions));
 
   // Message forwarder enabling communication with external Chrome extensions:
-  ChromeDebugger.onEventAddListener(
+  ChromeDebuggerOnEvent.addListener(
       allowInterop(_forwardMessageToExternalExtensions));
 
   // Maybe update the extension icon when the window focus changes:
