@@ -28,6 +28,7 @@ import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'chrome_api.dart';
+import 'web_api.dart';
 
 const _notADartAppAlert = 'No Dart application detected.'
     ' Are you trying to debug an application that includes a Chrome hosted app'
@@ -228,7 +229,7 @@ void _startDebugging(DebuggerTrigger debuggerTrigger) {
     } else if (_mostRecentDartTab != null) {
       attachDebuggerToTab(_mostRecentDartTab!);
     } else {
-      alert('''
+      window.alert('''
           Could not find a Dart app to start debugging. 
           The Dart Debug Extension will turn blue when 
           a Dart application is detected.
@@ -241,7 +242,7 @@ void _attachDebuggerToTab(Tab currentTab) async {
   if (!_debuggableTabs.contains(currentTab.id)) return;
 
   if (_tabIdToWarning.containsKey(currentTab.id)) {
-    alert(_tabIdToWarning[currentTab.id]);
+    window.alert(_tabIdToWarning[currentTab.id]);
     return;
   }
 
@@ -255,7 +256,7 @@ void _attachDebuggerToTab(Tab currentTab) async {
       } else {
         alertMessage = 'DevTools is already opened on a different window.';
       }
-      alert(alertMessage);
+      window.alert(alertMessage);
       return;
     }
     _tabsToAttach.add(currentTab);
@@ -314,7 +315,7 @@ void _maybeAttachDebugSession(
   // Chrome):
   if (method != 'Runtime.executionContextCreated') return;
 
-  final context = json.decode(stringify(params))['context'];
+  final context = json.decode(JSON.stringify(params))['context'];
   final tab = _tabsToAttach.firstWhereOrNull((tab) => tab.id == source.tabId);
   final contextId = context['id'] as int?;
   if (tab != null && contextId != null) {
@@ -385,7 +386,7 @@ void _handleMessageFromExternalExtensions(Map<String, dynamic>? request,
         // No arguments indicate that an error occurred.
         if (e == null) {
           sendResponse(
-              ErrorResponse()..error = stringify(chrome.runtime.lastError));
+              ErrorResponse()..error = JSON.stringify(chrome.runtime.lastError));
         } else {
           sendResponse(e);
         }
@@ -466,7 +467,7 @@ Future<bool> _tryAttach(
     final instanceId = value?[2] as String?;
     final dwdsVersion = value?[3] as String?;
     if (extensionUri == null || appId == null || instanceId == null) {
-      consoleWarn(
+      window.console.warn(
           'Unable to debug app. Missing Dart debugging global variables');
       successCompleter.complete(false);
       return;
@@ -545,13 +546,13 @@ Future<void> _startSseClient(
               .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
                 ..id = message.id
                 ..success = false
-                ..result = stringify(chrome.runtime.lastError)))));
+                ..result = JSON.stringify(chrome.runtime.lastError)))));
         } else {
           client.sink
               .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
                 ..id = message.id
                 ..success = true
-                ..result = stringify(e)))));
+                ..result = JSON.stringify(e)))));
         }
       }));
     } else if (message is ExtensionEvent) {
@@ -575,7 +576,7 @@ Future<void> _startSseClient(
     return;
   }, onError: (_) {
     _tabIdToEncodedUri.remove(currentTab.id);
-    alert('Lost app connection.');
+    window.alert('Lost app connection.');
     _removeAndDetachDebugSessionForTab(currentTab.id, null);
   }, cancelOnError: true);
 
@@ -634,7 +635,7 @@ void _updateIcon() {
 /// Construct an [ExtensionEvent] from [method] and [params].
 ExtensionEvent _extensionEventFor(String method, Object? params) =>
     ExtensionEvent((b) => b
-      ..params = jsonEncode(json.decode(stringify(params)))
+      ..params = jsonEncode(json.decode(JSON.stringify(params)))
       ..method = jsonEncode(method));
 
 /// Forward debugger events to the backend if applicable.
@@ -683,21 +684,6 @@ class Listener<T> {
 
   void Function(T value) onChange;
 }
-
-@JS('JSON.stringify')
-external String stringify(o);
-
-@JS('window.alert')
-external void alert([String? message]);
-
-@JS('console.warn')
-external void consoleWarn(String header,
-    [String? style1, String? style2, String? style3]);
-
-// For debugging purposes:
-@JS('console.log')
-external void consoleLog(String header,
-    [String? style1, String? style2, String? style3]);
 
 @JS()
 @anonymous
