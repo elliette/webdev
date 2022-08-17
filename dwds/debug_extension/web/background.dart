@@ -385,8 +385,8 @@ void _handleMessageFromExternalExtensions(Map<String, dynamic>? request,
       void sendResponseOrError([e]) {
         // No arguments indicate that an error occurred.
         if (e == null) {
-          sendResponse(
-              ErrorResponse()..error = JSON.stringify(chrome.runtime.lastError));
+          sendResponse(ErrorResponse()
+            ..error = JSON.stringify(chrome.runtime.lastError));
         } else {
           sendResponse(e);
         }
@@ -467,8 +467,8 @@ Future<bool> _tryAttach(
     final instanceId = value?[2] as String?;
     final dwdsVersion = value?[3] as String?;
     if (extensionUri == null || appId == null || instanceId == null) {
-      window.console.warn(
-          'Unable to debug app. Missing Dart debugging global variables');
+      window.console
+          .warn('Unable to debug app. Missing Dart debugging global variables');
       successCompleter.complete(false);
       return;
     }
