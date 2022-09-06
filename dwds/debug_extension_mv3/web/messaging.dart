@@ -208,8 +208,8 @@ class DebugInfo {
 extension RemoveTrailingSlash on String {
   String removeTrailingSlash() {
     final trailingSlash = '/';
-    if (this.endsWith(trailingSlash)) {
-      return this.substring(0, length - 1);
+    if (endsWith(trailingSlash)) {
+      return substring(0, length - 1);
     }
     return this;
   }
