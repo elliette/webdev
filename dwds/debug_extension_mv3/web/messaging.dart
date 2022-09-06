@@ -16,6 +16,7 @@ const debugTabChannelName = 'DEBUG_TAB_CHANNEL';
 
 enum Script {
   background,
+  debugInfo,
   debugTab,
   iframe,
   iframeInjector;
@@ -102,19 +103,21 @@ void interceptMessage<T>({
         break;
     }
   } catch (error) {
-    console.warn('Error intercepting expected message: $error');
+    console.warn(
+        'Error intercepting $expectedType from $expectedSender to $expectedRecipient: $error');
     return;
   }
 }
 
 String? jsEventToMessageData(
   Event event, {
-  required String expectedOrigin,
+  String? expectedOrigin,
 }) {
   try {
     final messageEvent = event as MessageEvent;
-    final origin = messageEvent.origin;
-    if (origin.removeTrailingSlash() != expectedOrigin.removeTrailingSlash()) {
+    if (expectedOrigin != null &&
+        messageEvent.origin.removeTrailingSlash() !=
+            expectedOrigin.removeTrailingSlash()) {
       return null;
     }
     return messageEvent.data as String;
@@ -161,19 +164,43 @@ class DebugState {
 }
 
 class DebugInfo {
-  final int tabId;
+  final int? tabId;
+  final String? origin;
+  final String? extensionUri;
+  final String? appId;
+  final String? instanceId;
 
-  DebugInfo({required this.tabId});
+  DebugInfo({
+    this.tabId,
+    this.origin,
+    this.extensionUri,
+    this.appId,
+    this.instanceId,
+  });
 
   factory DebugInfo.fromJSON(String json) {
     final decoded = jsonDecode(json) as Map<String, dynamic>;
-    final tabId = decoded['tabId'] as int;
-    return DebugInfo(tabId: tabId);
+    final tabId = decoded['tabId'] as int?;
+    final origin = decoded['origin'] as String?;
+    final extensionUri = decoded['extensionUri'] as String?;
+    final appId = decoded['appId'] as String?;
+    final instanceId = decoded['instanceId'] as String?;
+    return DebugInfo(
+      tabId: tabId,
+      origin: origin,
+      extensionUri: extensionUri,
+      appId: appId,
+      instanceId: instanceId,
+    );
   }
 
   String toJSON() {
     return jsonEncode({
       'tabId': tabId,
+      'origin': origin,
+      'extensionUri': extensionUri,
+      'appId': appId,
+      'instanceId': instanceId,
     });
   }
 }

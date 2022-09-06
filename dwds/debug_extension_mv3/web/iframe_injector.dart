@@ -26,6 +26,7 @@ void _injectIframe() {
   final iframe = document.createElement('iframe');
   final iframeSrc = chrome.runtime.getURL('iframe.html');
   iframe.setAttribute('src', iframeSrc);
+  iframe.setAttribute('id', 'dartDebugExtensionIframe');
   document.body?.append(iframe);
 }
 
@@ -45,12 +46,21 @@ void _handleWindowMessageEvents(Event event) {
 
 void _iframeReadyMessageHandler(IframeReady message) {
   if (message.isReady != true) return;
-  // TODO(elliette): Inject a script to fetch debug info global variables.
+  // Inject a script to fetch debug info global variables.
+  _injectDebugInfoScript();
 
   // Send a message back to IFRAME so that it has access to the tab ID.
   _sendMessageToIframe(
       type: MessageType.debugState,
       encodedBody: DebugState(shouldDebug: true).toJSON());
+}
+
+void _injectDebugInfoScript() {
+  final script = document.createElement('script');
+  final scriptSrc = chrome.runtime.getURL('debug_info.dart.js');
+  script.setAttribute('type', 'module');
+  script.setAttribute('src', scriptSrc);
+  document.head?.append(script);
 }
 
 void _sendMessageToIframe({

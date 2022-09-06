@@ -52,6 +52,10 @@ class Runtime {
   // https://developer.chrome.com/docs/extensions/reference/runtime/#method-getURL
   external String getURL(String path);
 
+  // https://developer.chrome.com/docs/extensions/reference/runtime/#property-lastError
+  // Note: Not checking the lastError when one occurs throws a runtime exception.
+  external ChromeError? get lastError;
+
   // https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage
   external OnMessageHandler get onMessage;
 }
@@ -135,4 +139,9 @@ class InjectDetails {
 class Target {
   external int get tabId;
   external factory Target({int tabId});
+}
+
+@JS()
+class ChromeError {
+  external String get message;
 }

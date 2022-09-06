@@ -12,14 +12,23 @@ import 'package:js/js.dart';
 import 'chrome_api.dart';
 import 'messaging.dart';
 
-final channel = BroadcastChannel(debugTabChannelName);
+const _notADartAppAlert = 'No Dart application detected.'
+    ' Are you trying to debug an application that includes a Chrome hosted app'
+    ' (an application listed in chrome://apps)? If so, debugging is disabled.'
+    ' You can fix this by removing the application from chrome://apps. Please'
+    ' see https://bugs.chromium.org/p/chromium/issues/detail?id=885025#c11.';
+
+const _devToolsAlreadyOpenedAlert =
+    'DevTools is already opened on a different window.';
+
+final _channel = BroadcastChannel(debugTabChannelName);
 
 void main() {
   _registerListeners();
 }
 
 void _registerListeners() {
-  channel.addEventListener(
+  _channel.addEventListener(
     'message',
     allowInterop(_handleChannelMessageEvents),
   );
@@ -41,15 +50,33 @@ void _handleChannelMessageEvents(Event event) {
 
 void _debugInfoMessageHandler(DebugInfo message) {
   final tabId = message.tabId;
-  _startDebugging(tabId);
+  if (tabId != null) {
+    _startDebugging(tabId);
+  }
 }
 
 void _startDebugging(int tabId) {
   final debuggee = Debuggee(tabId: tabId);
   chrome.debugger.attach(debuggee, '1.3', allowInterop(() async {
-    chrome.debugger.sendCommand(
-        debuggee, 'Runtime.enable', EmptyParam(), allowInterop((e) {}));
+    chrome.debugger.sendCommand(debuggee, 'Runtime.enable', EmptyParam(),
+        allowInterop((_) {
+      final chromeError = chrome.runtime.lastError;
+      if (chromeError != null) {
+        window.alert(_translateChromeError(chromeError.message));
+        return;
+      }
+      chrome.debugger.sendCommand(Debuggee(tabId: tabId), 'Runtime.enable',
+          EmptyParam(), allowInterop((_) {}));
+    }));
   }));
+}
+
+String _translateChromeError(String chromeErrorMessage) {
+  if (chromeErrorMessage.contains('Cannot access') ||
+      chromeErrorMessage.contains('Cannot attach')) {
+    return _notADartAppAlert;
+  }
+  return _devToolsAlreadyOpenedAlert;
 }
 
 @JS()

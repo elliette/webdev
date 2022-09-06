@@ -19,6 +19,7 @@
                 "<all_urls>"
             ],
             "resources": [
+                "debug_info.dart.js",
                 "iframe.html",
                 "iframe_injector.dart.js"
             ]
