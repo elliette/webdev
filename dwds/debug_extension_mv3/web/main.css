@@ -1,0 +1,31 @@
+body {
+    background-color: #202125;
+    /* TODO(elliette): Allow users to change theme color. */
+    color: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+h1 {
+    font-size: 20px;
+}
+
+iframe {
+    border: 0pt none;
+    height: 100%;
+    left: 0px;
+    position: absolute;
+    top: 0px;
+    width: 100%;
+}
+
+.flex-row {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+}
+
+.flex-column {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+}

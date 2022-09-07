@@ -143,10 +143,12 @@ void _connectToDwds(int contextId) async {
   client.stream.listen(
     (data) => _routeDwdsEvent(data, client),
     onDone: () {
-      console.log('Received done event.');
+      console.log('Closing debug connection with DWDS.');
+      _removeAndDetachDebugSessionForTab(_tabId);
     },
-    onError: (error) {
-      console.warn('Received error: $error');
+    onError: (_) {
+      console.warn('Received error, closing debug connection with DWDS.');
+      _removeAndDetachDebugSessionForTab(_tabId);
     },
     cancelOnError: true,
   );
@@ -208,8 +210,9 @@ void _injectDevToolsIframe(String devToolsUri) {
   final iframe = document.createElement('iframe');
   iframe.setAttribute('src', devToolsUri);
   iframe.setAttribute('scrolling', 'no');
-  iframe.setAttribute('style', 'border: 0pt none; height: 100%; width: 100%; position: absolute;');
-  document.body?.append(iframe);
+  final iframeContainer =
+      document.getElementById('dartDevToolsIframeContainer') as DivElement;
+  iframeContainer.append(iframe);
 }
 
 Future<bool> _authenticateUser(Uri uri, int tabId) async {
@@ -261,6 +264,40 @@ Future<String> _getTabUrl(int tabId) async {
   final tab = await promiseToFuture<Tab?>(chrome.tabs.get(tabId));
   return tab?.url ?? '';
 }
+
+// Tries to remove the debug session for the specified tab, and detach the
+// debugger associated with that debug session.
+void _removeAndDetachDebugSessionForTab(int tabId) {
+  final removedTabId = _removeDebugSessionForTab(tabId);
+
+  if (removedTabId != -1) {
+    chrome.debugger.detach(Debuggee(tabId: removedTabId), allowInterop(() {}));
+  }
+}
+
+// Tries to remove the debug session for the specified tab. If no session is
+// found, returns -1. Otherwise returns the tab ID.
+int _removeDebugSessionForTab(int tabId) {
+  final session = _debugSessions.firstWhereOrNull(
+      (session) => session.appTabId == tabId || session.devtoolsTabId == tabId);
+  if (session != null) {
+    // Note: package:sse will try to keep the connection alive, even after the
+    // client has been closed. Therefore the extension sends an event to notify
+    // DWDS that we should close the connection, instead of relying on the done
+    // event sent when the client is closed. See details:
+    // https://github.com/dart-lang/webdev/pull/1595#issuecomment-1116773378
+    final event =
+        _extensionEventFor('DebugExtension.detached', js_util.jsify({}));
+    session.sendEvent(event);
+    session.close();
+    _debugSessions.remove(session);
+
+    return session.appTabId;
+  } else {
+    return -1;
+  }
+}
+
 
 @JS()
 @anonymous

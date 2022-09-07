@@ -1,9 +1,19 @@
 <!DOCTYPE html>
 <html>
 
+<head>
+    <link rel="stylesheet" href="main.css">
+</head>
+
 <body>
-    <h1>Dart Debug Tab</h1>
-    <h2>Closing will disconnect the debug connection.</h2>
+    <div class='flex-row'>
+        <div class='flex-column'>
+            <h1>Connecting...</h1>
+        </div>
+        <div id="dartDevToolsIframeContainer"></div>
+    </div>
+
+    <!-- Load script: -->
     <script type="module" src="debug_tab.dart.js"></script>
 </body>
 

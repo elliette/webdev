@@ -22,11 +22,14 @@ class DebugSession {
   // The Dart app ID.
   final String appId;
 
-  // The tab ID that contains the corresponding Dart DevTools.
-  int? devtoolsTabId;
+  // The Dart app instance ID.
+  final String instanceId;
+
+  // The URI for the corresponding Dart DevTools.
+  final String? extensionUri;
 
   // Socket client for communication with dwds extension backend.
-  final SocketClient _socketClient;
+  late final SocketClient _socketClient;
 
   // How often to send batched events.
   static const int _batchDelayMilliseconds = 1000;
@@ -36,8 +39,24 @@ class DebugSession {
       BatchedStreamController<ExtensionEvent>(delay: _batchDelayMilliseconds);
   late final StreamSubscription<List<ExtensionEvent>> _batchSubscription;
 
-  DebugSession(this._socketClient, this.appTabId, this.appId) {
+  DebugSession({
+    required client,
+    required this.appTabId,
+    required this.appId,
+    required this.instanceId,
+    this.extensionUri,
+  }) : _socketClient = client {
     // Collect extension events and send them periodically to the server.
+    _batchSubscription = _batchController.stream.listen((events) {
+      _socketClient.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
+          (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
+    });
+  }
+
+  void set socketClient(SocketClient client) {
+    _socketClient = client;
+
+        // Collect extension events and send them periodically to the server.
     _batchSubscription = _batchController.stream.listen((events) {
       _socketClient.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
           (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
