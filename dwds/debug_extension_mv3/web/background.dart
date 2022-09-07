@@ -22,8 +22,8 @@ void main() {
 Future<Tab> _createDebugTab() async {
   final url = chrome.runtime.getURL('debug_tab.html');
   final tabPromise = chrome.tabs.create(TabInfo(
-    active: false,
-    pinned: true,
+    active: false, // Figure out why host permissions fail if set to true.
+    pinned: false,
     url: url,
   ));
   return promiseToFuture<Tab>(tabPromise);

@@ -37,9 +37,22 @@ class Debugger {
   external void attach(
       Debuggee target, String requiredVersion, Function? callback);
 
+  // https://developer.chrome.com/docs/extensions/reference/debugger/#method-detach
+  external void detach(Debuggee target, Function? callback);
+
   // https://developer.chrome.com/docs/extensions/reference/debugger/#method-sendCommand
   external void sendCommand(Debuggee target, String method,
       Object? commandParams, Function? callback);
+
+  // https://developer.chrome.com/docs/extensions/reference/debugger/#event-onEvent
+  external OnEventHandler get onEvent;
+}
+
+@JS()
+@anonymous
+class OnEventHandler {
+  external void addListener(
+      void Function(Debuggee source, String method, Object? params) callback);
 }
 
 @JS()
@@ -82,6 +95,9 @@ class Tabs {
 
   // https://developer.chrome.com/docs/extensions/reference/tabs/#method-create
   external Object create(TabInfo tabInfo);
+
+// https://developer.chrome.com/docs/extensions/reference/tabs/#method-get
+  external Object get(int tabId);
 }
 
 @JS()

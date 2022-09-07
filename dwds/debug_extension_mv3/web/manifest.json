@@ -20,6 +20,7 @@
             ],
             "resources": [
                 "debug_info.dart.js",
+                "debug_tab.html",
                 "iframe.html",
                 "iframe_injector.dart.js"
             ]

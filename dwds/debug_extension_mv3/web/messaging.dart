@@ -105,7 +105,6 @@ void interceptMessage<T>({
   } catch (error) {
     console.warn(
         'Error intercepting $expectedType from $expectedSender to $expectedRecipient: $error');
-    return;
   }
 }
 
