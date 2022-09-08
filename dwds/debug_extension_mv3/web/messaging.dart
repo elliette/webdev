@@ -12,8 +12,6 @@ import 'package:js/js.dart';
 
 import 'web_api.dart';
 
-const debugTabChannelName = 'DEBUG_TAB_CHANNEL';
-
 enum Script {
   background,
   debugInfo,
@@ -163,14 +161,12 @@ class DebugState {
 }
 
 class DebugInfo {
-  final int? tabId;
   final String? origin;
   final String? extensionUri;
   final String? appId;
   final String? instanceId;
 
   DebugInfo({
-    this.tabId,
     this.origin,
     this.extensionUri,
     this.appId,
@@ -179,13 +175,11 @@ class DebugInfo {
 
   factory DebugInfo.fromJSON(String json) {
     final decoded = jsonDecode(json) as Map<String, dynamic>;
-    final tabId = decoded['tabId'] as int?;
     final origin = decoded['origin'] as String?;
     final extensionUri = decoded['extensionUri'] as String?;
     final appId = decoded['appId'] as String?;
     final instanceId = decoded['instanceId'] as String?;
     return DebugInfo(
-      tabId: tabId,
       origin: origin,
       extensionUri: extensionUri,
       appId: appId,
@@ -195,7 +189,6 @@ class DebugInfo {
 
   String toJSON() {
     return jsonEncode({
-      'tabId': tabId,
       'origin': origin,
       'extensionUri': extensionUri,
       'appId': appId,
@@ -211,5 +204,21 @@ extension RemoveTrailingSlash on String {
       return substring(0, length - 1);
     }
     return this;
+  }
+}
+
+class DartTab {
+  final int tabId;
+
+  DartTab({required this.tabId});
+
+  factory DartTab.fromJSON(String json) {
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final tabId = decoded['tabId'] as int;
+    return DartTab(tabId: tabId);
+  }
+
+  String toJSON() {
+    return jsonEncode({'tabId': tabId});
   }
 }

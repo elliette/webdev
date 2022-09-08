@@ -14,6 +14,7 @@ class Chrome {
   external Debugger get debugger;
   external Runtime get runtime;
   external Scripting get scripting;
+  external Storage get storage;
   external Tabs get tabs;
 }
 
@@ -85,6 +86,30 @@ class OnMessageHandler {
 class Scripting {
   // https://developer.chrome.com/docs/extensions/reference/scripting/#method-executeScript
   external executeScript(InjectDetails details, Function? callback);
+}
+
+@JS()
+@anonymous
+class Storage {
+  // https://developer.chrome.com/docs/extensions/reference/storage/#type-StorageArea
+  external StorageArea get local;
+
+  // https://developer.chrome.com/docs/extensions/reference/storage/#event-onChanged
+  external OnChangedHandler get onChanged;
+}
+
+@JS()
+@anonymous
+class StorageArea {
+  external Object get(List<String> keys, void Function(Object result) callback);
+
+  external Object set(Object items, void Function()? callback);
+}
+
+@JS()
+@anonymous
+class OnChangedHandler {
+  external void addListener(void Function(Object, String) callback);
 }
 
 @JS()

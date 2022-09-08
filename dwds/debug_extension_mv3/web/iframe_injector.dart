@@ -11,8 +11,9 @@ import 'messaging.dart';
 void main() {
   _registerListeners();
 
-  // Inject the IFRAME into the current tab.
-  _injectIframe();
+  // Inject the IFRAMEs into the current tab.
+  _injectIframe('writer_iframe');
+  _injectIframe('debug_iframe');
 }
 
 void _registerListeners() {
@@ -22,11 +23,11 @@ void _registerListeners() {
   );
 }
 
-void _injectIframe() {
+void _injectIframe(String name) {
   final iframe = document.createElement('iframe');
-  final iframeSrc = chrome.runtime.getURL('iframe.html');
+  final iframeSrc = chrome.runtime.getURL('$name.html');
   iframe.setAttribute('src', iframeSrc);
-  iframe.setAttribute('id', 'dartDebugExtensionIframe');
+  iframe.setAttribute('id', name);
   document.body?.append(iframe);
 }
 

@@ -11,12 +11,7 @@ import 'package:js/js.dart';
 
 import 'chrome_api.dart';
 import 'messaging.dart';
-
-final _channel = BroadcastChannel(debugTabChannelName);
-
-int? _tabId;
-DebugInfo? _debugInfo;
-bool _messageSent = false;
+import 'storage.dart';
 
 void main() {
   _registerListeners();
@@ -30,10 +25,7 @@ void main() {
 
 void _registerListeners() {
   chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
-  window.addEventListener(
-    'message',
-    allowInterop(_handleWindowMessageEvents),
-  );
+  window.addEventListener('message', allowInterop(_handleWindowMessages));
 }
 
 void _sendMessageToIframeInjector({
@@ -61,16 +53,16 @@ void _handleRuntimeMessages(
       messageHandler: (DebugState message) {
         final senderTabId = sender.tab?.id;
         if (senderTabId != null && message.shouldDebug) {
-          if (_debugInfo != null && !_messageSent) {
-            _sendMessageToDebugTab(senderTabId, _debugInfo!);
-          } else {
-            _tabId = senderTabId;
-          }
+          chrome.storage.local.set(
+              DartTabStorageObject(
+                dartTabJson: DartTab(tabId: senderTabId).toJSON(),
+              ),
+              /*callback*/ null);
         }
       });
 }
 
-void _handleWindowMessageEvents(Event event) {
+void _handleWindowMessages(Event event) {
   final messageData = jsEventToMessageData(event);
   if (messageData == null) return;
 
@@ -80,28 +72,10 @@ void _handleWindowMessageEvents(Event event) {
       expectedSender: Script.debugInfo,
       expectedRecipient: Script.iframe,
       messageHandler: (DebugInfo message) {
-        if (_tabId != null && !_messageSent) {
-          _sendMessageToDebugTab(_tabId!, message);
-        } else {
-          _debugInfo = message;
-        }
+        chrome.storage.local.set(
+            DebugInfoStorageObject(
+              debugInfoJson: message.toJSON(),
+            ),
+            /*callback*/ null);
       });
-}
-
-void _sendMessageToDebugTab(int tabId, DebugInfo debugInfo) {
-  final encodedBody = new DebugInfo(
-    tabId: tabId,
-    origin: debugInfo.origin,
-    extensionUri: debugInfo.extensionUri,
-    appId: debugInfo.appId,
-    instanceId: debugInfo.instanceId,
-  ).toJSON();
-  final message = Message(
-    to: Script.debugTab,
-    from: Script.iframe,
-    type: MessageType.debugInfo,
-    encodedBody: encodedBody,
-  );
-  _channel.postMessage(message.toJSON());
-  _messageSent = true;
 }

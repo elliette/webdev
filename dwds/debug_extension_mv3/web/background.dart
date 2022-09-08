@@ -14,19 +14,8 @@ import 'chrome_api.dart';
 void main() {
   // Detect clicks on the Dart Debug Extension icon.
   chrome.action.onClicked.addListener(allowInterop((_) async {
-    await _createDebugTab();
     await _executeInjectorScript();
   }));
-}
-
-Future<Tab> _createDebugTab() async {
-  final url = chrome.runtime.getURL('debug_tab.html');
-  final tabPromise = chrome.tabs.create(TabInfo(
-    active: false, // Figure out why host permissions fail if set to true.
-    pinned: false,
-    url: url,
-  ));
-  return promiseToFuture<Tab>(tabPromise);
 }
 
 Future<void> _executeInjectorScript() async {

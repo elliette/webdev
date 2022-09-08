@@ -45,6 +45,6 @@ void _sendMessageToIframe({
     encodedBody: encodedBody,
   );
   final iframe =
-      document.getElementById('dartDebugExtensionIframe') as IFrameElement;
+      document.getElementById('writer_iframe') as IFrameElement;
   iframe.contentWindow?.postMessage(message.toJSON(), '*');
 }
