@@ -36,48 +36,26 @@ void _handleWindowMessageEvents(Event event) {
       jsEventToMessageData(event, expectedOrigin: chrome.runtime.getURL(''));
   if (messageData == null) return;
 
-  interceptMessage<IframeReady>(
+  interceptMessage<DartTab>(
     message: messageData,
-    expectedType: MessageType.iframeReady,
+    expectedType: MessageType.dartTab,
     expectedSender: Script.iframe,
     expectedRecipient: Script.iframeInjector,
-    messageHandler: _iframeReadyMessageHandler,
+    messageHandler: _dartTabMessageHandler,
   );
 }
 
-void _iframeReadyMessageHandler(IframeReady message) {
-  if (message.isReady != true) return;
+void _dartTabMessageHandler(DartTab message) {
   // Inject a script to fetch debug info global variables.
-  _injectDebugInfoScript();
-
-  // Send a message back to IFRAME so that it has access to the tab ID.
-  _sendMessageToIframe(
-      type: MessageType.debugState,
-      encodedBody: DebugState(shouldDebug: true).toJSON());
+  _injectDebugInfoScript(message.tabId);
 }
 
-void _injectDebugInfoScript() {
+void _injectDebugInfoScript(int tabId) {
   final script = document.createElement('script');
   final scriptSrc = chrome.runtime.getURL('debug_info.dart.js');
   script.setAttribute('type', 'module');
   script.setAttribute('src', scriptSrc);
+  script.setAttribute('data-tabid', tabId);
+  script.setAttribute('id', 'debugInfoScript');
   document.head?.append(script);
-}
-
-void _sendMessageToIframe({
-  required MessageType type,
-  required String encodedBody,
-}) {
-  final message = Message(
-    to: Script.iframe,
-    from: Script.iframeInjector,
-    type: type,
-    encodedBody: encodedBody,
-  );
-  chrome.runtime.sendMessage(
-    /*id*/ null,
-    message.toJSON(),
-    /*options*/ null,
-    /*callback*/ null,
-  );
 }

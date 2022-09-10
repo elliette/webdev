@@ -37,48 +37,116 @@ const _devToolsAlreadyOpenedAlert =
 
 DebugSession? _debugSession;
 
+// TODO: Figure out how to get the tab ID.
+late String tabId;
+
 void main() async {
-  _registerListeners();
-  _maybeUpdateDebuggingState();
+  final id = await _getTabId();
+  tabId = '$id';
+
+  // _registerListeners();
+  // _maybeUpdateDebuggingState();
 }
 
 void _registerListeners() {
-  chrome.storage.onChanged.addListener((_, __) {
+  chrome.storage.onChanged.addListener(allowInterop((_, __) {
     _maybeUpdateDebuggingState();
-  });
+  }));
 }
 
 void _maybeUpdateDebuggingState() async {
-  final debugInfoJson = await fetchStorageObjectJson(StorageObject.debugInfo);
-  final dartTabJson = await fetchStorageObjectJson(StorageObject.dartTab);
-  if (debugInfoJson == null && dartTabJson == null && _debugSession != null) {
-    _stopDebugging();
-  }
+  final debugStateJson = await fetchStorageObjectJson(
+    type: StorageObject.debugState,
+    tabId: tabId,
+  );
 
-  if (debugInfoJson != null && dartTabJson != null && _debugSession == null) {
-    final debugInfo = DebugInfo.fromJSON(debugInfoJson);
-    final dartTab = DartTab.fromJSON(dartTabJson);
-    _startDebugging(dartTab.tabId, debugInfo: debugInfo);
+  if (debugStateJson == null) return;
+
+  final debugState = DebugState.fromJSON(debugStateJson);
+  switch (debugState) {
+    case DebugState.startDebugging:
+      _startDebugging();
+      break;
+    case DebugState.isDebugging:
+      _maybeReconnectToDwds();
+      break;
+    case DebugState.stopDebugging:
+      _stopDebugging();
+      break;
   }
 }
 
-void _startDebugging(int tabId, {required DebugInfo debugInfo}) {
-  _debugSession = DebugSession(tabId, debugInfo: debugInfo);
-  final session = _debugSession!;
+void _startDebugging() async {
+  _debugSession = null;
+
+  final newSession = await _createDebugSession();
+  if (newSession == null) return;
+  _debugSession = newSession;
+
+  // When a debug session is detached, remove the reference to it:
+  chrome.debugger.onDetach.addListener(allowInterop((Debuggee source, _) {
+    if (source.tabId == newSession.tabId) {
+      setStorageObject(
+        type: StorageObject.debugState,
+        json: DebugState.stopDebugging.toJSON(),
+        tabId: tabId,
+      );
+    }
+  }));
+  chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
+  chrome.debugger.attach(
+      _debugSession!.debuggee, '1.3', allowInterop(_onDebuggerAttached));
+}
+
+Future<DebugSession?> _createDebugSession() async {
+  final debugInfoJson =
+      await fetchStorageObjectJson(type: StorageObject.debugInfo, tabId: tabId);
+
+  if (debugInfoJson == null) {
+    console.warn('Can\'t debug without debug info.');
+    return null;
+  }
+
+  final debugInfo = DebugInfo.fromJSON(debugInfoJson);
+  final dartTab = debugInfo.tabId;
+  if (dartTab == null) {
+    console.warn('Can\'t debug without a dart tab.');
+    return null;
+  }
+  return DebugSession(int.parse(dartTab), debugInfo: debugInfo);
+}
+
+void _maybeReconnectToDwds() async {
+  if (_debugSession != null) {
+    window.console.log('Not reconnecting to DWDS, we have a debug session');
+  }
+
+  final newSession = await _createDebugSession();
+  if (newSession == null) return;
+  _debugSession = newSession;
 
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
-  chrome.debugger
-      .attach(session.debuggee, '1.3', allowInterop(_onDebuggerAttached));
+
+  window.console.log('trying to reconnect to devtools');
+  _connectToDwds(openDevTools: false);
 }
 
 void _stopDebugging() {
+  if (_debugSession == null) return;
+  _debugSession!.close();
+  _debugSession = null;
   // TODO(elliette): Implement.
-  window.console.log('Should stop debugging.');
+  window.console.log('Stopped debugging.');
 }
 
 _onDebuggerAttached() {
   final session = _debugSession;
   if (session == null) return;
+  setStorageObject(
+    type: StorageObject.debugState,
+    json: DebugState.isDebugging.toJSON(),
+    tabId: tabId,
+  );
 
   chrome.debugger.sendCommand(session.debuggee, 'Runtime.enable', EmptyParam(),
       allowInterop((_) {
@@ -105,11 +173,7 @@ void _forwardChromeDebuggerEventToDwds(
 
   final event = _extensionEventFor(method, params);
 
-  if (method == 'Debugger.scriptParsed') {
-    session.sendBatchedEvent(event);
-  } else {
-    session.sendEvent(event);
-  }
+  session.sendEvent(event);
 }
 
 void _handleExecutionContextCreated(Debuggee source, Object? params) {
@@ -121,11 +185,24 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) {
   final contextOrigin = context['origin'] as String;
   if (contextOrigin == session.debugInfo.origin) {
     final contextId = context['id'] as int;
-    _connectToDwds(contextId);
+    chrome.storage.local.set(
+        ContextIdStorageObject(
+          contextIdJson: ContextId(contextId: contextId).toJSON(),
+        ),
+        /*callback*/ allowInterop(_connectToDwds));
   }
 }
 
-void _connectToDwds(int contextId) async {
+void _connectToDwds({bool openDevTools = true}) async {
+  final contextIdJson = await fetchStorageObjectJson(
+    type: StorageObject.contextId,
+    tabId: tabId,
+  );
+  if (contextIdJson == null) {
+    console.warn('Can\'t connect to DWDS without a context ID.');
+    return;
+  }
+  final contextId = ContextId.fromJSON(contextIdJson).contextId;
   final session = _debugSession;
   if (session == null) return;
   final extensionUri = session.debugInfo.extensionUri;
@@ -138,7 +215,7 @@ void _connectToDwds(int contextId) async {
   _debugSession!.socketClient = client;
 
   // Listen to events from DWDS:
-  client.stream.listen(
+  client.stream.asBroadcastStream().listen(
     (data) => _routeDwdsEvent(data, client),
     onDone: () {
       console.log('Received done event.');
@@ -149,7 +226,9 @@ void _connectToDwds(int contextId) async {
     cancelOnError: true,
   );
 
-  _sendDevToolsRequest(client, contextId);
+  if (openDevTools) {
+    _sendDevToolsRequest(client, contextId);
+  }
 }
 
 void _routeDwdsEvent(String eventData, SocketClient client) {
@@ -262,4 +341,11 @@ Future<String> _getTabUrl(int tabId) async {
 @anonymous
 class EmptyParam {
   external factory EmptyParam();
+}
+
+Future<int?> _getTabId() async {
+  final query = QueryInfo(active: true, currentWindow: true);
+  final tabs = List<Tab>.from(await promiseToFuture(chrome.tabs.query(query)));
+  final tab = tabs.isNotEmpty ? tabs.first : null;
+  return tab?.id;
 }

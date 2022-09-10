@@ -13,9 +13,11 @@ import 'package:js/js.dart';
 import 'web_api.dart';
 
 enum Script {
+  debugIframe,
   background,
   debugInfo,
   debugTab,
+  detector,
   iframe,
   iframeInjector;
 
@@ -25,6 +27,8 @@ enum Script {
 }
 
 enum MessageType {
+  dartAppDetected,
+  dartTab,
   debugInfo,
   debugState,
   iframeReady;
@@ -90,6 +94,12 @@ void interceptMessage<T>({
     final messageType = decodedMessage.type;
     final messageBody = decodedMessage.encodedBody;
     switch (messageType) {
+      case MessageType.dartAppDetected:
+        messageHandler(DartAppDetected.fromJSON(messageBody) as T);
+        break;
+      case MessageType.dartTab:
+        messageHandler(DartTab.fromJSON(messageBody) as T);
+        break;
       case MessageType.debugInfo:
         messageHandler(DebugInfo.fromJSON(messageBody) as T);
         break;
@@ -142,20 +152,20 @@ class IframeReady {
   }
 }
 
-class DebugState {
-  final bool shouldDebug;
-
-  DebugState({required this.shouldDebug});
+enum DebugState {
+  isDebugging,
+  startDebugging,
+  stopDebugging;
 
   factory DebugState.fromJSON(String json) {
     final decoded = jsonDecode(json) as Map<String, dynamic>;
-    final shouldDebug = decoded['shouldDebug'] as bool;
-    return DebugState(shouldDebug: shouldDebug);
+    final debugStateValue = decoded['debugState'] as String;
+    return DebugState.values.byName(debugStateValue);
   }
 
   String toJSON() {
     return jsonEncode({
-      'shouldDebug': shouldDebug,
+      'debugState': name,
     });
   }
 }
@@ -165,12 +175,14 @@ class DebugInfo {
   final String? extensionUri;
   final String? appId;
   final String? instanceId;
+  final String? tabId;
 
   DebugInfo({
     this.origin,
     this.extensionUri,
     this.appId,
     this.instanceId,
+    this.tabId,
   });
 
   factory DebugInfo.fromJSON(String json) {
@@ -179,11 +191,13 @@ class DebugInfo {
     final extensionUri = decoded['extensionUri'] as String?;
     final appId = decoded['appId'] as String?;
     final instanceId = decoded['instanceId'] as String?;
+        final tabId = decoded['tabId'] as String?;
     return DebugInfo(
       origin: origin,
       extensionUri: extensionUri,
       appId: appId,
       instanceId: instanceId,
+      tabId: tabId,
     );
   }
 
@@ -193,6 +207,7 @@ class DebugInfo {
       'extensionUri': extensionUri,
       'appId': appId,
       'instanceId': instanceId,
+      'tabId': tabId,
     });
   }
 }
@@ -220,5 +235,23 @@ class DartTab {
 
   String toJSON() {
     return jsonEncode({'tabId': tabId});
+  }
+}
+
+class DartAppDetected {
+  final bool detected;
+
+  DartAppDetected({required this.detected});
+
+  factory DartAppDetected.fromJSON(String json) {
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final detected = decoded['detected'] as bool;
+    return DartAppDetected(detected: detected);
+  }
+
+  String toJSON() {
+    return jsonEncode({
+      'detected': detected,
+    });
   }
 }

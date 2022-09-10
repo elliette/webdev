@@ -5,7 +5,9 @@
 @JS()
 library iframe;
 
+import 'dart:convert';
 import 'dart:html';
+import 'dart:js_util';
 
 import 'package:js/js.dart';
 
@@ -13,18 +15,19 @@ import 'chrome_api.dart';
 import 'messaging.dart';
 import 'storage.dart';
 
-void main() {
+late int tabId;
+void main() async {
   _registerListeners();
+  tabId = await _getTabId() ?? -1;
 
-  // Send a message to the injector script that the IFRAME has loaded.
+  // Send a message to the injector script so that it has access to the tab.
   _sendMessageToIframeInjector(
-    type: MessageType.iframeReady,
-    encodedBody: IframeReady(isReady: true).toJSON(),
+    type: MessageType.dartTab,
+    encodedBody: DartTab(tabId: tabId).toJSON(),
   );
 }
 
 void _registerListeners() {
-  chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
   window.addEventListener('message', allowInterop(_handleWindowMessages));
 }
 
@@ -41,27 +44,6 @@ void _sendMessageToIframeInjector({
   window.parent?.postMessage(message.toJSON(), '*');
 }
 
-void _handleRuntimeMessages(
-    dynamic jsRequest, MessageSender sender, Function sendResponse) {
-  if (jsRequest is! String) return;
-
-  interceptMessage<DebugState>(
-      message: jsRequest,
-      expectedType: MessageType.debugState,
-      expectedSender: Script.iframeInjector,
-      expectedRecipient: Script.iframe,
-      messageHandler: (DebugState message) {
-        final senderTabId = sender.tab?.id;
-        if (senderTabId != null && message.shouldDebug) {
-          chrome.storage.local.set(
-              DartTabStorageObject(
-                dartTabJson: DartTab(tabId: senderTabId).toJSON(),
-              ),
-              /*callback*/ null);
-        }
-      });
-}
-
 void _handleWindowMessages(Event event) {
   final messageData = jsEventToMessageData(event);
   if (messageData == null) return;
@@ -72,10 +54,19 @@ void _handleWindowMessages(Event event) {
       expectedSender: Script.debugInfo,
       expectedRecipient: Script.iframe,
       messageHandler: (DebugInfo message) {
-        chrome.storage.local.set(
-            DebugInfoStorageObject(
-              debugInfoJson: message.toJSON(),
-            ),
-            /*callback*/ null);
+        final tabId = message.tabId!;
+        setStorageObject(
+          type: StorageObject.debugInfo,
+          json: message.toJSON(),
+          tabId: tabId,
+        );
       });
+}
+
+// TODO: Move into shared file.
+Future<int?> _getTabId() async {
+  final query = QueryInfo(active: true, currentWindow: true);
+  final tabs = List<Tab>.from(await promiseToFuture(chrome.tabs.query(query)));
+  final tab = tabs.isNotEmpty ? tabs.first : null;
+  return tab?.id;
 }

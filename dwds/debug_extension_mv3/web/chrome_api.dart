@@ -21,6 +21,9 @@ class Chrome {
 @JS()
 @anonymous
 class Action {
+  // https://developer.chrome.com/docs/extensions/reference/action/#method-setIcon
+  external void setIcon(IconInfo iconInfo, Function? callback);
+
   // https://developer.chrome.com/docs/extensions/reference/action/#event-onClicked
   external OnClickedHandler get onClicked;
 }
@@ -47,6 +50,16 @@ class Debugger {
 
   // https://developer.chrome.com/docs/extensions/reference/debugger/#event-onEvent
   external OnEventHandler get onEvent;
+
+    // https://developer.chrome.com/docs/extensions/reference/debugger/#event-onDetach
+  external OnDetachHandler get onDetach;
+}
+
+@JS()
+@anonymous
+class OnDetachHandler {
+  external void addListener(
+      void Function(Debuggee source, String reason) callback);
 }
 
 @JS()
@@ -104,6 +117,8 @@ class StorageArea {
   external Object get(List<String> keys, void Function(Object result) callback);
 
   external Object set(Object items, void Function()? callback);
+
+  external Object clear(void Function()? callback);
 }
 
 @JS()
@@ -123,6 +138,23 @@ class Tabs {
 
 // https://developer.chrome.com/docs/extensions/reference/tabs/#method-get
   external Object get(int tabId);
+
+    // https://developer.chrome.com/docs/extensions/reference/tabs/#event-onRemoved
+  external OnRemovedHandler get onRemoved;
+}
+
+@JS()
+@anonymous
+class OnRemovedHandler {
+  external void addListener(
+      void Function(int tabId, RemoveInfo removeInfo) callback);
+}
+
+@JS()
+@anonymous
+class RemoveInfo {
+  external int get windowId;
+  external bool get isWindowClosing;
 }
 
 @JS()
@@ -185,4 +217,11 @@ class Target {
 @JS()
 class ChromeError {
   external String get message;
+}
+
+@JS()
+@anonymous
+class IconInfo {
+  external String get path;
+  external factory IconInfo({String path});
 }

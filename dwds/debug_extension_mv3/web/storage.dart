@@ -5,39 +5,56 @@
 @JS()
 library storage;
 
+import 'dart:convert';
+import 'dart:js_util';
+
 import 'package:js/js.dart';
 import 'dart:async';
 
 import 'chrome_api.dart';
+import 'web_api.dart';
 
 enum StorageObject {
+  contextId,
   dartTab,
+  debugState,
   debugInfo;
 
   String get keyName {
     switch (this) {
+      case StorageObject.contextId:
+        return 'contextIdJson';
       case StorageObject.dartTab:
         return 'dartTabJson';
       case StorageObject.debugInfo:
         return 'debugInfoJson';
+      case StorageObject.debugState:
+        return 'debugStateJson';
     }
   }
 }
 
-Future<String?> fetchStorageObjectJson(StorageObject object) {
+void setStorageObject({
+  required StorageObject type,
+  required String json,
+  required String tabId,
+}) {
+  final storageKey = '$tabId-${type.keyName}';
+  final map = <String, String>{storageKey: json};
+  chrome.storage.local.set(jsify(map), allowInterop(() {
+    console.log('Set ${type.keyName} object: $json.');
+  }));
+}
+
+Future<String?> fetchStorageObjectJson({
+  required StorageObject type,
+  required String tabId,
+}) {
+  final storageKey = '$tabId-${type.keyName}';
   final completer = new Completer<String?>();
-  chrome.storage.local.get([object.keyName], allowInterop((Object result) {
-    String? json;
-    switch (object) {
-      case StorageObject.debugInfo:
-        final debugInfoObject = result as DebugInfoStorageObject;
-        json = debugInfoObject.debugInfoJson;
-        break;
-      case StorageObject.dartTab:
-        final dartTabObject = result as DartTabStorageObject;
-        json = dartTabObject.dartTabJson;
-        break;
-    }
+  chrome.storage.local.get([storageKey], allowInterop((Object result) {
+    final json = getProperty(result, storageKey) as String?;
+    console.log('Fetched ${type.keyName} object: $json.');
     completer.complete(json);
   }));
   return completer.future;
@@ -45,14 +62,23 @@ Future<String?> fetchStorageObjectJson(StorageObject object) {
 
 @JS()
 @anonymous
-class DebugInfoStorageObject {
-  external String? get debugInfoJson;
-  external factory DebugInfoStorageObject({String debugInfoJson});
+class ContextIdStorageObject {
+  external String? get contextIdJson;
+  external factory ContextIdStorageObject({String contextIdJson});
 }
 
-@JS()
-@anonymous
-class DartTabStorageObject {
-  external String? get dartTabJson;
-  external factory DartTabStorageObject({String dartTabJson});
+class ContextId {
+  final int contextId;
+
+  ContextId({required this.contextId});
+
+  factory ContextId.fromJSON(String json) {
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final contextId = decoded['contextId'] as int;
+    return ContextId(contextId: contextId);
+  }
+
+  String toJSON() {
+    return jsonEncode({'contextId': contextId});
+  }
 }

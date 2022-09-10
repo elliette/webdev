@@ -13,6 +13,12 @@ import 'package:js/js.dart';
 import 'messaging.dart';
 
 void main() {
+  final scriptElement = document.getElementById('debugInfoScript');
+  window.console.log('SCRIPT ELEMENT IS $scriptElement');
+  final tabId = scriptElement?.dataset['tabid'];
+  // final dartTabId = scriptElement?.getAttribute('data-tabid');
+  window.console.log('DART TAB ID IS!!!  $tabId');
+
   // Send a message to the IFRAME with the debug info.
   _sendMessageToIframe(
     type: MessageType.debugInfo,
@@ -21,6 +27,13 @@ void main() {
 }
 
 DebugInfo _readDartDebugInfo() {
+
+    final scriptElement = document.getElementById('debugInfoScript');
+  window.console.log('SCRIPT ELEMENT IS $scriptElement');
+  final tabId = scriptElement?.dataset['tabid'];
+  // final dartTabId = scriptElement?.getAttribute('data-tabid');
+  window.console.log('DART TAB ID IS!!!  $tabId');
+
   final origin = window.location.origin;
   final windowContext = JsObject.fromBrowserObject(window);
   final extensionUri = windowContext['\$dartExtensionUri'];
@@ -31,6 +44,7 @@ DebugInfo _readDartDebugInfo() {
     extensionUri: extensionUri,
     appId: appId,
     instanceId: instanceId,
+    tabId: tabId,
   );
 }
 

@@ -28,8 +28,6 @@ class DebugSession {
   // Socket client for communication with dwds extension backend.
   SocketClient? _socketClient;
 
-  // How often to send batched events.
-  static const int _batchDelayMilliseconds = 1000;
 
   Debuggee get debuggee {
     return Debuggee(tabId: tabId);
@@ -37,13 +35,8 @@ class DebugSession {
 
   void set socketClient(SocketClient client) {
     _socketClient = client;
-    _sendBatchedEventsToServer();
+    // TODO(elliette): Send batched events to server.
   }
-
-  // Collect events into batches to be send periodically to the server.
-  final _batchController =
-      BatchedStreamController<ExtensionEvent>(delay: _batchDelayMilliseconds);
-  late final StreamSubscription<List<ExtensionEvent>> _batchSubscription;
 
   DebugSession(this.tabId, {required this.debugInfo});
 
@@ -53,25 +46,9 @@ class DebugSession {
     }
   }
 
-  void sendBatchedEvent(ExtensionEvent event) {
-    _batchController.sink.add(event);
-  }
-
   void close() {
     if (_socketClient != null) {
       _socketClient!.close();
     }
-    _batchSubscription.cancel();
-    _batchController.close();
-  }
-
-  void _sendBatchedEventsToServer() {
-    // Collect extension events and send them periodically to the server.
-    _batchSubscription = _batchController.stream.listen((events) {
-      if (_socketClient != null) {
-        _socketClient!.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
-            (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
-      }
-    });
   }
 }
