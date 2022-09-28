@@ -11,7 +11,6 @@ import 'package:js/js.dart';
 
 import 'chrome_api.dart';
 import 'messaging.dart';
-import 'web_api.dart';
 import 'storage.dart';
 
 void main() {
@@ -22,9 +21,8 @@ void _registerListeners() {
   chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
 
   // Detect clicks on the Dart Debug Extension icon.
-  chrome.action.onClicked.addListener(allowInterop((_) {
-    _executeInjectorScript();
-    final tabId = _getTabId();
+  chrome.action.onClicked.addListener(allowInterop((_) async {
+    final tabId = await _getTabId();
     setStorageObject(
       type: StorageObject.debugState,
       json: DebugState.startDebugging.toJSON(),
@@ -55,7 +53,6 @@ void _handleRuntimeMessages(
       expectedSender: Script.detector,
       expectedRecipient: Script.background,
       messageHandler: (DartAppDetected message) {
-        console.log('Dart app was detected.');
         _handleDartAppDetected(message);
       });
 }
@@ -73,6 +70,7 @@ Future<void> _executeInjectorScript() async {
 
 void _handleDartAppDetected(DartAppDetected message) {
   if (message.detected) {
+    _executeInjectorScript();
     chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
   }
 }

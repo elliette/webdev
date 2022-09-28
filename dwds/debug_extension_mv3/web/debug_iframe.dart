@@ -37,15 +37,22 @@ const _devToolsAlreadyOpenedAlert =
 
 DebugSession? _debugSession;
 
-// TODO: Figure out how to get the tab ID.
 late String tabId;
+late Debuggee debuggee;
+late DebugInfo debugInfo;
 
 void main() async {
   final id = await _getTabId();
-  tabId = '$id';
+  if (id == null) {
+    console.warn('Can\'t debug without a tab ID.');
+    return null;
+  }
 
-  // _registerListeners();
-  // _maybeUpdateDebuggingState();
+  tabId = '$id';
+  debuggee = Debuggee(tabId: id);
+
+  _registerListeners();
+  _maybeUpdateDebuggingState();
 }
 
 void _registerListeners() {
@@ -68,7 +75,8 @@ void _maybeUpdateDebuggingState() async {
       _startDebugging();
       break;
     case DebugState.isDebugging:
-      _maybeReconnectToDwds();
+      window.console.log('might reconnect to DWDS');
+      // _maybeReconnectToDwds();
       break;
     case DebugState.stopDebugging:
       _stopDebugging();
@@ -77,78 +85,43 @@ void _maybeUpdateDebuggingState() async {
 }
 
 void _startDebugging() async {
-  _debugSession = null;
-
-  final newSession = await _createDebugSession();
-  if (newSession == null) return;
-  _debugSession = newSession;
-
-  // When a debug session is detached, remove the reference to it:
-  chrome.debugger.onDetach.addListener(allowInterop((Debuggee source, _) {
-    if (source.tabId == newSession.tabId) {
-      setStorageObject(
-        type: StorageObject.debugState,
-        json: DebugState.stopDebugging.toJSON(),
-        tabId: tabId,
-      );
-    }
-  }));
-  chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
-  chrome.debugger.attach(
-      _debugSession!.debuggee, '1.3', allowInterop(_onDebuggerAttached));
-}
-
-Future<DebugSession?> _createDebugSession() async {
   final debugInfoJson =
       await fetchStorageObjectJson(type: StorageObject.debugInfo, tabId: tabId);
-
   if (debugInfoJson == null) {
     console.warn('Can\'t debug without debug info.');
     return null;
   }
+  debugInfo = DebugInfo.fromJSON(debugInfoJson);
 
-  final debugInfo = DebugInfo.fromJSON(debugInfoJson);
-  final dartTab = debugInfo.tabId;
-  if (dartTab == null) {
-    console.warn('Can\'t debug without a dart tab.');
-    return null;
-  }
-  return DebugSession(int.parse(dartTab), debugInfo: debugInfo);
-}
-
-void _maybeReconnectToDwds() async {
-  if (_debugSession != null) {
-    window.console.log('Not reconnecting to DWDS, we have a debug session');
-  }
-
-  final newSession = await _createDebugSession();
-  if (newSession == null) return;
-  _debugSession = newSession;
-
+  chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
-
-  window.console.log('trying to reconnect to devtools');
-  _connectToDwds(openDevTools: false);
+  chrome.debugger.attach(debuggee, '1.3', allowInterop(_onDebuggerAttach));
 }
 
 void _stopDebugging() {
-  if (_debugSession == null) return;
-  _debugSession!.close();
-  _debugSession = null;
-  // TODO(elliette): Implement.
-  window.console.log('Stopped debugging.');
-}
-
-_onDebuggerAttached() {
   final session = _debugSession;
   if (session == null) return;
+
+  // Note: package:sse will try to keep the connection alive, even after the
+  // client has been closed. Therefore the extension sends an event to notify
+  // DWDS that we should close the connection, instead of relying on the done
+  // event sent when the client is closed. See details:
+  // https://github.com/dart-lang/webdev/pull/1595#issuecomment-1116773378
+  final event =
+      _extensionEventFor('DebugExtension.detached', js_util.jsify({}));
+  session.sendEvent(event);
+  session.close();
+  _debugSession = null;
+}
+
+void _onDebuggerAttach() {
   setStorageObject(
     type: StorageObject.debugState,
     json: DebugState.isDebugging.toJSON(),
     tabId: tabId,
   );
 
-  chrome.debugger.sendCommand(session.debuggee, 'Runtime.enable', EmptyParam(),
+  chrome.debugger.sendCommand(debuggee, 'Runtime.enable', EmptyParam(),
       allowInterop((_) {
     final chromeError = chrome.runtime.lastError;
     if (chromeError != null) {
@@ -156,6 +129,15 @@ _onDebuggerAttached() {
       return;
     }
   }));
+}
+
+void _onDebuggerDetach(Debuggee source, String _) {
+  if (tabId != '${source.tabId}') return;
+  setStorageObject(
+    type: StorageObject.debugState,
+    json: DebugState.stopDebugging.toJSON(),
+    tabId: tabId,
+  );
 }
 
 void _onDebuggerEvent(Debuggee source, String method, Object? params) {
@@ -172,24 +154,22 @@ void _forwardChromeDebuggerEventToDwds(
   if (session == null) return;
 
   final event = _extensionEventFor(method, params);
-
   session.sendEvent(event);
 }
 
-void _handleExecutionContextCreated(Debuggee source, Object? params) {
+void _handleExecutionContextCreated(Debuggee source, Object? params) async {
   if (params == null) return;
-  final session = _debugSession;
-  if (session == null) return;
 
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String;
-  if (contextOrigin == session.debugInfo.origin) {
+  if (contextOrigin == debugInfo.origin) {
     final contextId = context['id'] as int;
-    chrome.storage.local.set(
-        ContextIdStorageObject(
-          contextIdJson: ContextId(contextId: contextId).toJSON(),
-        ),
-        /*callback*/ allowInterop(_connectToDwds));
+    setStorageObject(
+      type: StorageObject.contextId,
+      json: ContextId(contextId: contextId).toJSON(),
+      tabId: tabId,
+      callback: _connectToDwds,
+    );
   }
 }
 
@@ -203,19 +183,20 @@ void _connectToDwds({bool openDevTools = true}) async {
     return;
   }
   final contextId = ContextId.fromJSON(contextIdJson).contextId;
-  final session = _debugSession;
-  if (session == null) return;
-  final extensionUri = session.debugInfo.extensionUri;
+  final extensionUri = debugInfo.extensionUri;
   if (extensionUri == null) return;
 
   final uri = Uri.parse(extensionUri);
-  final authenticated = await _authenticateUser(uri, session.tabId);
+  final authenticated = await _authenticateUser(uri);
   if (!authenticated) return;
-  final client = _createClient(uri);
-  _debugSession!.socketClient = client;
+  final client = uri.isScheme('ws') || uri.isScheme('wss')
+      ? WebSocketClient(WebSocketChannel.connect(uri))
+      : SseSocketClient(SseClient(uri.toString()));
+  _debugSession = DebugSession(client, int.parse(tabId), debugInfo.appId!);
 
   // Listen to events from DWDS:
-  client.stream.asBroadcastStream().listen(
+  // client.stream.asBroadcastStream().listen?
+  client.stream.listen(
     (data) => _routeDwdsEvent(data, client),
     onDone: () {
       console.log('Received done event.');
@@ -255,7 +236,7 @@ void _forwardDwdsEventToChromeDebugger(
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
   chrome.debugger
-      .sendCommand(session.debuggee, message.command, js_util.jsify(params),
+      .sendCommand(debuggee, message.command, js_util.jsify(params),
           allowInterop(([e]) {
     // No arguments indicate that an error occurred.
     if (e == null) {
@@ -278,16 +259,16 @@ void _sendDevToolsRequest(SocketClient client, int contextId) async {
   final session = _debugSession;
   if (session == null) return;
 
-  final tabUrl = await _getTabUrl(session.tabId);
+  final tabUrl = await _getTabUrl(int.parse(tabId));
   client.sink.add(jsonEncode(serializers.serialize(DevToolsRequest((b) => b
-    ..appId = session.debugInfo.appId
-    ..instanceId = session.debugInfo.instanceId
+    ..appId = debugInfo.appId
+    ..instanceId = debugInfo.instanceId
     ..contextId = contextId
     ..tabUrl = tabUrl
     ..uriOnly = false))));
 }
 
-Future<bool> _authenticateUser(Uri uri, int tabId) async {
+Future<bool> _authenticateUser(Uri uri) async {
   var authUri = uri.replace(path: _authenticationPath);
   if (authUri.scheme == 'ws') authUri = authUri.replace(scheme: 'http');
   if (authUri.scheme == 'wss') authUri = authUri.replace(scheme: 'https');
@@ -303,7 +284,7 @@ Future<bool> _authenticateUser(Uri uri, int tabId) async {
     if (window.confirm(
         'Authentication required.\n\nClick OK to authenticate then try again.')) {
       window.open(authUrl, 'Dart DevTools Authentication');
-      chrome.debugger.detach(Debuggee(tabId: tabId), allowInterop(() {}));
+      chrome.debugger.detach(debuggee, allowInterop(() {}));
     }
     return false;
   }
@@ -315,13 +296,6 @@ ExtensionEvent _extensionEventFor(String method, dynamic params) {
   return ExtensionEvent((b) => b
     ..params = jsonEncode(json.decode(JSON.stringify(params)))
     ..method = jsonEncode(method));
-}
-
-SocketClient _createClient(Uri uri) {
-  if (uri.isScheme('ws') || uri.isScheme('wss')) {
-    return WebSocketClient(WebSocketChannel.connect(uri));
-  }
-  return SseSocketClient(SseClient(uri.toString()));
 }
 
 String _translateChromeError(String chromeErrorMessage) {

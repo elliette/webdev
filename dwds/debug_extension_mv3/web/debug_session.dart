@@ -15,40 +15,47 @@ import 'package:dwds/src/sockets.dart';
 import 'package:dwds/src/utilities/batched_stream.dart';
 import 'package:js/js.dart';
 
-import 'chrome_api.dart';
-import 'messaging.dart';
 
 class DebugSession {
   // The tab ID that contains the running Dart application.
-  final int tabId;
+  final int appTabId;
 
-  // Debug info for the running Dart application.
-  final DebugInfo debugInfo;
+  // The Dart app ID.
+  final String appId;
+
+  // The tab ID that contains the corresponding Dart DevTools.
+  int? devtoolsTabId;
 
   // Socket client for communication with dwds extension backend.
-  SocketClient? _socketClient;
+  final SocketClient _socketClient;
 
+  // How often to send batched events.
+  static const int _batchDelayMilliseconds = 1000;
 
-  Debuggee get debuggee {
-    return Debuggee(tabId: tabId);
+  // Collect events into batches to be send periodically to the server.
+  final _batchController =
+      BatchedStreamController<ExtensionEvent>(delay: _batchDelayMilliseconds);
+  late final StreamSubscription<List<ExtensionEvent>> _batchSubscription;
+
+  DebugSession(this._socketClient, this.appTabId, this.appId) {
+    // Collect extension events and send them periodically to the server.
+    _batchSubscription = _batchController.stream.listen((events) {
+      _socketClient.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
+          (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
+    });
   }
-
-  void set socketClient(SocketClient client) {
-    _socketClient = client;
-    // TODO(elliette): Send batched events to server.
-  }
-
-  DebugSession(this.tabId, {required this.debugInfo});
 
   void sendEvent(ExtensionEvent event) {
-    if (_socketClient != null) {
-      _socketClient!.sink.add(jsonEncode(serializers.serialize(event)));
-    }
+    _socketClient.sink.add(jsonEncode(serializers.serialize(event)));
+  }
+
+  void sendBatchedEvent(ExtensionEvent event) {
+    _batchController.sink.add(event);
   }
 
   void close() {
-    if (_socketClient != null) {
-      _socketClient!.close();
-    }
+    _socketClient.close();
+    _batchSubscription.cancel();
+    _batchController.close();
   }
 }

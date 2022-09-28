@@ -38,11 +38,15 @@ void setStorageObject({
   required StorageObject type,
   required String json,
   required String tabId,
+  void Function()? callback,
 }) {
   final storageKey = '$tabId-${type.keyName}';
   final map = <String, String>{storageKey: json};
   chrome.storage.local.set(jsify(map), allowInterop(() {
-    console.log('Set ${type.keyName} object: $json.');
+    console.log('Set storage item: $map.');
+    if (callback != null) {
+      callback();
+    }
   }));
 }
 
@@ -54,7 +58,7 @@ Future<String?> fetchStorageObjectJson({
   final completer = new Completer<String?>();
   chrome.storage.local.get([storageKey], allowInterop((Object result) {
     final json = getProperty(result, storageKey) as String?;
-    console.log('Fetched ${type.keyName} object: $json.');
+    console.log('Fetched storage item for $storageKey: $json.');
     completer.complete(json);
   }));
   return completer.future;
