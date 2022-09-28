@@ -36,10 +36,10 @@ const _devToolsAlreadyOpenedAlert =
     'DevTools is already opened on a different window.';
 
 DebugSession? _debugSession;
+DebugInfo? _debugInfo;
 
 late String tabId;
 late Debuggee debuggee;
-late DebugInfo debugInfo;
 
 void main() async {
   final id = await _getTabId();
@@ -84,15 +84,7 @@ void _maybeUpdateDebuggingState() async {
   }
 }
 
-void _startDebugging() async {
-  final debugInfoJson =
-      await fetchStorageObjectJson(type: StorageObject.debugInfo, tabId: tabId);
-  if (debugInfoJson == null) {
-    console.warn('Can\'t debug without debug info.');
-    return null;
-  }
-  debugInfo = DebugInfo.fromJSON(debugInfoJson);
-
+void _startDebugging() {
   chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.attach(debuggee, '1.3', allowInterop(_onDebuggerAttach));
@@ -149,7 +141,7 @@ void _onDebuggerEvent(Debuggee source, String method, Object? params) {
 }
 
 void _forwardChromeDebuggerEventToDwds(
-    Debuggee source, String method, dynamic params) {
+    Debuggee source, String method, dynamic params) async {
   final session = _debugSession;
   if (session == null) return;
 
@@ -162,6 +154,7 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
 
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String;
+  final debugInfo = await _getDebugInfo();
   if (contextOrigin == debugInfo.origin) {
     final contextId = context['id'] as int;
     setStorageObject(
@@ -183,6 +176,7 @@ void _connectToDwds({bool openDevTools = true}) async {
     return;
   }
   final contextId = ContextId.fromJSON(contextIdJson).contextId;
+  final debugInfo = await _getDebugInfo();
   final extensionUri = debugInfo.extensionUri;
   if (extensionUri == null) return;
 
@@ -258,6 +252,7 @@ void _forwardDwdsEventToChromeDebugger(
 void _sendDevToolsRequest(SocketClient client, int contextId) async {
   final session = _debugSession;
   if (session == null) return;
+  final debugInfo = await _getDebugInfo();
 
   final tabUrl = await _getTabUrl(int.parse(tabId));
   client.sink.add(jsonEncode(serializers.serialize(DevToolsRequest((b) => b
@@ -322,4 +317,15 @@ Future<int?> _getTabId() async {
   final tabs = List<Tab>.from(await promiseToFuture(chrome.tabs.query(query)));
   final tab = tabs.isNotEmpty ? tabs.first : null;
   return tab?.id;
+}
+
+Future<DebugInfo> _getDebugInfo() async {
+  if (_debugInfo != null) return _debugInfo!;
+  final debugInfoJson =
+      await fetchStorageObjectJson(type: StorageObject.debugInfo, tabId: tabId);
+  if (debugInfoJson == null) {
+    throw Exception('Can\'t debug without debug info.');
+  }
+  _debugInfo = DebugInfo.fromJSON(debugInfoJson);
+  return _debugInfo!;
 }
