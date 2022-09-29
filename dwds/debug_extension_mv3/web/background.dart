@@ -31,17 +31,54 @@ void _registerListeners() {
     );
   }));
 
+  chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
+
   // When a Dart application tab is closed, detach the corresponding debug
   // session:
-  // chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
+  chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
 }
 
-// Tries to remove the debug session for the specified tab, and detach the
-// debugger associated with that debug session.
-void _detachDebuggerForTab(int tabId, _) {
-  // TODO: only detach debugger if we are debugging that tab (check Chrome storage).
-  // Change DebugState in Chrome storage to not debugging.
-  chrome.debugger.detach(Debuggee(tabId: tabId), allowInterop(() {}));
+void _onDebuggerDetach(Debuggee source, String _) async {
+  final isDartAppBeingDebugged = await _isDartAppBeingDebugged(source.tabId);
+  if (!isDartAppBeingDebugged) return;
+
+  // Remove the corresponding Dart DevTools:
+  final json = await fetchStorageObjectJson(
+      type: StorageObject.devToolsTab, tabId: '${source.tabId}');
+  if (json != null) {
+    final devToolsTab = DevToolsTab.fromJSON(json).tabId;
+    chrome.tabs.remove([devToolsTab], /*callback=*/ null);
+  }
+
+  // Update storage objects to notify debug_iframe to stop debugging:
+  await removeStorageObject(
+    type: StorageObject.devToolsTab,
+    tabId: '${source.tabId}',
+  );
+  await setStorageObject(
+    type: StorageObject.debugState,
+    json: DebugState.stopDebugging.toJSON(),
+    tabId: '${source.tabId}',
+  );
+}
+
+void _detachDebuggerForTab(int tabId, _) async {
+  final shouldDetach = await _isDartAppBeingDebugged(tabId);
+  if (shouldDetach) {
+    chrome.debugger.detach(Debuggee(tabId: tabId), allowInterop(() {}));
+  }
+}
+
+Future<bool> _isDartAppBeingDebugged(int tabId) async {
+  // Verify that the tab is for a Dart app:
+  final json = await fetchStorageObjectJson(
+    type: StorageObject.debugState,
+    tabId: '$tabId',
+  );
+  if (json == null) return false;
+
+  final debugState = DebugState.fromJSON(json);
+  return debugState == DebugState.isDebugging;
 }
 
 void _handleRuntimeMessages(
@@ -71,7 +108,7 @@ Future<void> _executeInjectorScript() async {
 
 void _handleDartAppDetected(DartAppDetected message) {
   if (message.detected) {
-    console.log('DART APP WAS DETECTED.');
+    console.log('====== DART APP WAS DETECTED. =====');
     _executeInjectorScript();
     chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
   }

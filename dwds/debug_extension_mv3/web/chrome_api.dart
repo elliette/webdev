@@ -118,6 +118,8 @@ class StorageArea {
 
   external Object set(Object items, void Function()? callback);
 
+  external void remove(List<String> keys, void Function()? callback);
+
   external Object clear(void Function()? callback);
 }
 
@@ -138,6 +140,8 @@ class Tabs {
 
 // https://developer.chrome.com/docs/extensions/reference/tabs/#method-get
   external Object get(int tabId);
+
+  external void remove(List<int> tabIds, void Function()? callback);
 
     // https://developer.chrome.com/docs/extensions/reference/tabs/#event-onRemoved
   external OnRemovedHandler get onRemoved;

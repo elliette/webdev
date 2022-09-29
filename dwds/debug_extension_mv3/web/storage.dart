@@ -37,7 +37,7 @@ enum StorageObject {
   }
 }
 
-void setStorageObject({
+Future<bool> setStorageObject({
   required StorageObject type,
   required String json,
   required String tabId,
@@ -45,12 +45,15 @@ void setStorageObject({
 }) {
   final storageKey = '$tabId-${type.keyName}';
   final map = <String, String>{storageKey: json};
+    final completer = new Completer<bool>();
   chrome.storage.local.set(jsify(map), allowInterop(() {
-    // console.log('Set storage item: $map.');
+    console.log('--- setting { $storageKey: $json }.');
     if (callback != null) {
       callback();
     }
+        completer.complete(true);
   }));
+    return completer.future;
 }
 
 Future<String?> fetchStorageObjectJson({
@@ -61,8 +64,21 @@ Future<String?> fetchStorageObjectJson({
   final completer = new Completer<String?>();
   chrome.storage.local.get([storageKey], allowInterop((Object result) {
     final json = getProperty(result, storageKey) as String?;
-    // console.log('Fetched storage item for $storageKey: $json.');
+    console.log('--- fetching { $storageKey: $json }.');
     completer.complete(json);
+  }));
+  return completer.future;
+}
+
+Future<bool> removeStorageObject({
+  required StorageObject type,
+  required String tabId,
+}) {
+  final storageKey = '$tabId-${type.keyName}';
+  final completer = new Completer<bool>();
+  chrome.storage.local.remove([storageKey], allowInterop(() {
+    console.log('--- removed $storageKey.');
+    completer.complete(true);
   }));
   return completer.future;
 }

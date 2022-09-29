@@ -95,7 +95,7 @@ void _maybeReconnectToDwds() {
 }
 
 void _startDebugging() {
-  chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
+  // chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.attach(debuggee, '1.3', allowInterop(_onDebuggerAttach));
 }
@@ -134,16 +134,16 @@ void _onDebuggerAttach() {
   }));
 }
 
-void _onDebuggerDetach(Debuggee source, String _) {
-  console.log('Debugger detached...');
-  // if (tabId != '${source.tabId}') return;
-  setStorageObject(
-    type: StorageObject.debugState,
-    json: DebugState.stopDebugging.toJSON(),
-    tabId: tabId,
-  );
-  // TODO: Remove storage object for DevToolsTab
-}
+// void _onDebuggerDetach(Debuggee source, String _) async {
+//   console.log('Debugger detached...');
+//   // if (tabId != '${source.tabId}') return;
+//   await removeStorageObject(type: StorageObject.devToolsTab, tabId: tabId);
+//   setStorageObject(
+//     type: StorageObject.debugState,
+//     json: DebugState.stopDebugging.toJSON(),
+//     tabId: tabId,
+//   );
+// }
 
 void _onDebuggerEvent(Debuggee source, String method, Object? params) {
   if (method == 'Runtime.executionContextCreated') {

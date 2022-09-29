@@ -11,17 +11,34 @@ import 'package:js/js.dart';
 import 'chrome_api.dart';
 import 'messaging.dart';
 
+bool isDartApp = false;
+bool isLoaded = false;
+
 void main() {
   _registerListeners();
 }
 
 void _registerListeners() {
+  document.onReadyStateChange.listen((_) {
+    if (isLoaded) return;
+    if (document.readyState != 'complete') return;
+    isLoaded = true;
+    _maybeSendDartReadyMessage();
+  });
+
   document.addEventListener('dart-app-ready', (_) {
+    isDartApp = true;
+    _maybeSendDartReadyMessage();
+  });
+}
+
+void _maybeSendDartReadyMessage() {
+  if (isLoaded && isDartApp) {
     _sendMessageToBackground(
       type: MessageType.dartAppDetected,
       encodedBody: DartAppDetected(detected: true).toJSON(),
     );
-  });
+  }
 }
 
 void _sendMessageToBackground({
