@@ -15,6 +15,7 @@ import 'package:dwds/src/sockets.dart';
 import 'package:dwds/src/utilities/batched_stream.dart';
 import 'package:js/js.dart';
 
+import 'web_api.dart';
 
 class DebugSession {
   // The tab ID that contains the running Dart application.
@@ -54,6 +55,7 @@ class DebugSession {
   }
 
   void close() {
+    console.warn('======= CLOSING SOCKET CLIENT. =========');
     _socketClient.close();
     _batchSubscription.cancel();
     _batchController.close();

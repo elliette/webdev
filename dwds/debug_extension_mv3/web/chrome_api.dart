@@ -134,7 +134,7 @@ class Tabs {
   external Object query(QueryInfo queryInfo);
 
   // https://developer.chrome.com/docs/extensions/reference/tabs/#method-create
-  external Object create(TabInfo tabInfo);
+  external Object create(TabInfo tabInfo, void Function(Tab tab) callback);
 
 // https://developer.chrome.com/docs/extensions/reference/tabs/#method-get
   external Object get(int tabId);
@@ -189,7 +189,8 @@ class TabInfo {
 class QueryInfo {
   external bool get active;
   external bool get currentWindow;
-  external factory QueryInfo({bool? active, bool? currentWindow});
+  external String get url;
+  external factory QueryInfo({bool? active, bool? currentWindow, String? url});
 }
 
 @JS()

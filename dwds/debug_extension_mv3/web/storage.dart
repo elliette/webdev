@@ -17,6 +17,7 @@ import 'web_api.dart';
 enum StorageObject {
   contextId,
   dartTab,
+  devToolsTab,
   debugState,
   debugInfo;
 
@@ -26,6 +27,8 @@ enum StorageObject {
         return 'contextIdJson';
       case StorageObject.dartTab:
         return 'dartTabJson';
+      case StorageObject.devToolsTab:
+        return 'devToolsTabJson';
       case StorageObject.debugInfo:
         return 'debugInfoJson';
       case StorageObject.debugState:
@@ -43,7 +46,7 @@ void setStorageObject({
   final storageKey = '$tabId-${type.keyName}';
   final map = <String, String>{storageKey: json};
   chrome.storage.local.set(jsify(map), allowInterop(() {
-    console.log('Set storage item: $map.');
+    // console.log('Set storage item: $map.');
     if (callback != null) {
       callback();
     }
@@ -58,7 +61,7 @@ Future<String?> fetchStorageObjectJson({
   final completer = new Completer<String?>();
   chrome.storage.local.get([storageKey], allowInterop((Object result) {
     final json = getProperty(result, storageKey) as String?;
-    console.log('Fetched storage item for $storageKey: $json.');
+    // console.log('Fetched storage item for $storageKey: $json.');
     completer.complete(json);
   }));
   return completer.future;
@@ -84,5 +87,30 @@ class ContextId {
 
   String toJSON() {
     return jsonEncode({'contextId': contextId});
+  }
+}
+
+@JS()
+@anonymous
+class DevToolsTabStorageObject {
+  external String? get devToolsTabJson;
+  external factory DevToolsTabStorageObject({String devToolsTabJson});
+}
+
+class DevToolsTab {
+  final int tabId;
+  final String tabUrl;
+
+  DevToolsTab({required this.tabId, required this.tabUrl});
+
+  factory DevToolsTab.fromJSON(String json) {
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final tabId = decoded['tabId'] as int;
+    final tabUrl = decoded['tabUrl'] as String;
+    return DevToolsTab(tabId: tabId, tabUrl: tabUrl);
+  }
+
+  String toJSON() {
+    return jsonEncode({'tabId': tabId, 'tabUrl': tabUrl});
   }
 }

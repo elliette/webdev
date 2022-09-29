@@ -12,6 +12,7 @@ import 'package:js/js.dart';
 import 'chrome_api.dart';
 import 'messaging.dart';
 import 'storage.dart';
+import 'web_api.dart';
 
 void main() {
   _registerListeners();
@@ -32,7 +33,7 @@ void _registerListeners() {
 
   // When a Dart application tab is closed, detach the corresponding debug
   // session:
-  chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
+  // chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
 }
 
 // Tries to remove the debug session for the specified tab, and detach the
@@ -70,6 +71,7 @@ Future<void> _executeInjectorScript() async {
 
 void _handleDartAppDetected(DartAppDetected message) {
   if (message.detected) {
+    console.log('DART APP WAS DETECTED.');
     _executeInjectorScript();
     chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
   }

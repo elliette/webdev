@@ -154,6 +154,7 @@ class IframeReady {
 
 enum DebugState {
   isDebugging,
+  isConnecting,
   startDebugging,
   stopDebugging;
 

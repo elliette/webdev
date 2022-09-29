@@ -7,6 +7,7 @@ library debug_iframe;
 
 import 'dart:convert';
 import 'dart:html';
+import 'dart:async';
 
 import 'package:built_collection/built_collection.dart';
 import 'package:js/js.dart';
@@ -41,6 +42,8 @@ DebugInfo? _debugInfo;
 late String tabId;
 late Debuggee debuggee;
 
+// WORKS WITH CHANGES IN a-new-client CITC client. / mv3-extension-connection
+
 void main() async {
   final id = await _getTabId();
   if (id == null) {
@@ -66,7 +69,6 @@ void _maybeUpdateDebuggingState() async {
     type: StorageObject.debugState,
     tabId: tabId,
   );
-
   if (debugStateJson == null) return;
 
   final debugState = DebugState.fromJSON(debugStateJson);
@@ -75,13 +77,21 @@ void _maybeUpdateDebuggingState() async {
       _startDebugging();
       break;
     case DebugState.isDebugging:
-      window.console.log('might reconnect to DWDS');
-      // _maybeReconnectToDwds();
+      _maybeReconnectToDwds();
       break;
     case DebugState.stopDebugging:
       _stopDebugging();
       break;
+    case DebugState.isConnecting:
+      // Don't do anything if we are currently trying to connect to DWDS.
+      break;
   }
+}
+
+void _maybeReconnectToDwds() {
+  if (_debugSession != null) return;
+  console.log('Reconnecting to DWDS...');
+  _connectToDwds();
 }
 
 void _startDebugging() {
@@ -91,6 +101,7 @@ void _startDebugging() {
 }
 
 void _stopDebugging() {
+  console.log('Stop debugging...');
   final session = _debugSession;
   if (session == null) return;
 
@@ -109,7 +120,7 @@ void _stopDebugging() {
 void _onDebuggerAttach() {
   setStorageObject(
     type: StorageObject.debugState,
-    json: DebugState.isDebugging.toJSON(),
+    json: DebugState.isConnecting.toJSON(),
     tabId: tabId,
   );
 
@@ -124,12 +135,14 @@ void _onDebuggerAttach() {
 }
 
 void _onDebuggerDetach(Debuggee source, String _) {
-  if (tabId != '${source.tabId}') return;
+  console.log('Debugger detached...');
+  // if (tabId != '${source.tabId}') return;
   setStorageObject(
     type: StorageObject.debugState,
     json: DebugState.stopDebugging.toJSON(),
     tabId: tabId,
   );
+  // TODO: Remove storage object for DevToolsTab
 }
 
 void _onDebuggerEvent(Debuggee source, String method, Object? params) {
@@ -166,7 +179,7 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
   }
 }
 
-void _connectToDwds({bool openDevTools = true}) async {
+void _connectToDwds() async {
   final contextIdJson = await fetchStorageObjectJson(
     type: StorageObject.contextId,
     tabId: tabId,
@@ -187,6 +200,11 @@ void _connectToDwds({bool openDevTools = true}) async {
       ? WebSocketClient(WebSocketChannel.connect(uri))
       : SseSocketClient(SseClient(uri.toString()));
   _debugSession = DebugSession(client, int.parse(tabId), debugInfo.appId!);
+  setStorageObject(
+    type: StorageObject.debugState,
+    json: DebugState.isDebugging.toJSON(),
+    tabId: tabId,
+  );
 
   // Listen to events from DWDS:
   // client.stream.asBroadcastStream().listen?
@@ -201,12 +219,10 @@ void _connectToDwds({bool openDevTools = true}) async {
     cancelOnError: true,
   );
 
-  if (openDevTools) {
     _sendDevToolsRequest(client, contextId);
-  }
 }
 
-void _routeDwdsEvent(String eventData, SocketClient client) {
+void _routeDwdsEvent(String eventData, SocketClient client) async {
   final message = serializers.deserialize(jsonDecode(eventData));
   if (message is ExtensionRequest) {
     _forwardDwdsEventToChromeDebugger(message, client);
@@ -217,9 +233,52 @@ void _routeDwdsEvent(String eventData, SocketClient client) {
         break;
       case 'dwds.devtoolsUri':
         // TODO(elliette): Embed in Chrome DevTools panel.
+        final url = message.params;
+        await _handleDevToolsUrl(url);
         break;
     }
   }
+}
+
+Future<void> _handleDevToolsUrl(String url) async {
+  final json = await fetchStorageObjectJson(
+    type: StorageObject.devToolsTab,
+    tabId: tabId,
+  );
+  if (json != null) {
+    final devToolsTab = DevToolsTab.fromJSON(json);
+    final expectedUrl =
+        _getQueryParameter(url: devToolsTab.tabUrl, param: 'uri');
+    final actualUrl = _getQueryParameter(
+        url: await _getTabUrl(devToolsTab.tabId), param: 'uri');
+
+    if (expectedUrl == actualUrl) {
+      console.log('Not opening $url, already have $actualUrl');
+      return;
+    }
+  }
+
+  final completer = Completer<void>();
+  chrome.tabs.create(
+      TabInfo(
+        active: false, // Figure out why host permissions fail if set to true.
+        pinned: false,
+        url: url,
+      ), allowInterop((Tab tab) async {
+    final id = tab.id;
+    final tabUrl = await _getTabUrl(id);
+    setStorageObject(
+        type: StorageObject.devToolsTab,
+        json: DevToolsTab(
+          tabId: id,
+          tabUrl: tabUrl,
+        ).toJSON(),
+        tabId: tabId,
+        callback: () {
+          completer.complete();
+        });
+  }));
+  return completer.future;
 }
 
 void _forwardDwdsEventToChromeDebugger(
@@ -260,7 +319,7 @@ void _sendDevToolsRequest(SocketClient client, int contextId) async {
     ..instanceId = debugInfo.instanceId
     ..contextId = contextId
     ..tabUrl = tabUrl
-    ..uriOnly = false))));
+    ..uriOnly = true))));
 }
 
 Future<bool> _authenticateUser(Uri uri) async {
@@ -301,9 +360,15 @@ String _translateChromeError(String chromeErrorMessage) {
   return _devToolsAlreadyOpenedAlert;
 }
 
-Future<String> _getTabUrl(int tabId) async {
+Future<String> _getTabUrl(int tabId, {int retries = 3}) async {
   final tab = await promiseToFuture<Tab?>(chrome.tabs.get(tabId));
-  return tab?.url ?? '';
+  final tabUrl = tab?.url ?? '';
+  if (tabUrl.isNotEmpty || retries == 0) {
+    return tabUrl;
+  }
+
+  await Future.delayed(Duration(seconds: 1));
+  return _getTabUrl(tabId, retries: retries - 1);
 }
 
 @JS()
@@ -328,4 +393,9 @@ Future<DebugInfo> _getDebugInfo() async {
   }
   _debugInfo = DebugInfo.fromJSON(debugInfoJson);
   return _debugInfo!;
+}
+
+String _getQueryParameter({required String url, required String param}) {
+  final uri = Uri.dataFromString(url);
+  return uri.queryParameters[param] ?? '';
 }
