@@ -7,12 +7,15 @@ library detector;
 
 import 'dart:html';
 import 'package:js/js.dart';
+import 'dart:js_util';
 
 import 'chrome_api.dart';
 import 'messaging.dart';
+import 'web_api.dart';
 
-bool isDartApp = false;
+bool dartAppReady = false;
 bool isLoaded = false;
+String? debugInfo;
 
 void main() {
   _registerListeners();
@@ -27,16 +30,22 @@ void _registerListeners() {
   });
 
   document.addEventListener('dart-app-ready', (_) {
-    isDartApp = true;
+    debugInfo = getProperty(_, 'detail') as String?;
+    console.log('IN DETECTOR, debugInfo is $debugInfo');
+    dartAppReady = true;
     _maybeSendDartReadyMessage();
   });
 }
 
-void _maybeSendDartReadyMessage() {
-  if (isLoaded && isDartApp) {
+void _maybeSendDartReadyMessage() async {
+  if (isLoaded && dartAppReady) {
+    if (debugInfo == null) {
+      console.warn('Can\'t debug without debug info.');
+      return;
+    }
     _sendMessageToBackground(
-      type: MessageType.dartAppDetected,
-      encodedBody: DartAppDetected(detected: true).toJSON(),
+      type: MessageType.debugInfo,
+      encodedBody: debugInfo!,
     );
   }
 }

@@ -20,10 +20,13 @@ void main() {
 
 void _registerListeners() {
   chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
+  // chrome.webNavigation.onCommitted
+  //     .addListener(allowInterop(_maybeReinjectIframe));
 
   // Detect clicks on the Dart Debug Extension icon.
   chrome.action.onClicked.addListener(allowInterop((_) async {
     final tabId = await _getTabId();
+    // _executeInjectorScript();
     setStorageObject(
       type: StorageObject.debugState,
       json: DebugState.startDebugging.toJSON(),
@@ -37,6 +40,16 @@ void _registerListeners() {
   // session:
   chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
 }
+
+// void _maybeReinjectIframe(NavigationInfo navigationInfo) async {
+//   if (['reload', 'typed'].contains(navigationInfo.transitionType)) {
+//     final json = await fetchStorageObjectJson(
+//         type: StorageObject.devToolsTab, tabId: '${navigationInfo.tabId}');
+//     if (json != null) {
+//       _executeInjectorScript();
+//     }
+//   }
+// }
 
 void _onDebuggerDetach(Debuggee source, String _) async {
   final isDartAppBeingDebugged = await _isDartAppBeingDebugged(source.tabId);
@@ -82,16 +95,31 @@ Future<bool> _isDartAppBeingDebugged(int tabId) async {
 }
 
 void _handleRuntimeMessages(
-    dynamic jsRequest, MessageSender sender, Function sendResponse) {
+    dynamic jsRequest, MessageSender sender, Function sendResponse) async {
   if (jsRequest is! String) return;
 
-  interceptMessage<DartAppDetected>(
+  final tabId = await _getTabId();
+  if (tabId == null) return;
+  final id = '${tabId}';
+
+  interceptMessage<DebugInfo>(
       message: jsRequest,
-      expectedType: MessageType.dartAppDetected,
+      expectedType: MessageType.debugInfo,
       expectedSender: Script.detector,
       expectedRecipient: Script.background,
-      messageHandler: (DartAppDetected message) {
-        _handleDartAppDetected(message);
+      messageHandler: (DebugInfo message) async {
+        chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
+        final json = await fetchStorageObjectJson(
+            type: StorageObject.debugInfo, tabId: id);
+        if (json == message.toJSON()) {
+          console.log('Not setting debug info, already set.');
+        } else {
+          setStorageObject(
+              type: StorageObject.debugInfo, json: message.toJSON(), tabId: id);
+        }
+        // Inject the debug IFRAME:
+        console.log('EXECUTING INJECTOR SCRIPT, WE HAVE A DART APP.');
+        _executeInjectorScript();
       });
 }
 
@@ -103,14 +131,6 @@ Future<void> _executeInjectorScript() async {
           target: Target(tabId: tabId), files: ['iframe_injector.dart.js']),
       /*callback*/ null,
     );
-  }
-}
-
-void _handleDartAppDetected(DartAppDetected message) {
-  if (message.detected) {
-    console.log('====== DART APP WAS DETECTED. =====');
-    _executeInjectorScript();
-    chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
   }
 }
 

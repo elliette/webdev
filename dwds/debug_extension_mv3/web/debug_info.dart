@@ -28,7 +28,7 @@ void main() {
 
 DebugInfo _readDartDebugInfo() {
 
-    final scriptElement = document.getElementById('debugInfoScript');
+  final scriptElement = document.getElementById('debugInfoScript');
   window.console.log('SCRIPT ELEMENT IS $scriptElement');
   final tabId = scriptElement?.dataset['tabid'];
   // final dartTabId = scriptElement?.getAttribute('data-tabid');
@@ -44,7 +44,6 @@ DebugInfo _readDartDebugInfo() {
     extensionUri: extensionUri,
     appId: appId,
     instanceId: instanceId,
-    tabId: tabId,
   );
 }
 

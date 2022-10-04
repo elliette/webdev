@@ -54,12 +54,11 @@ void _handleWindowMessages(Event event) {
       expectedSender: Script.debugInfo,
       expectedRecipient: Script.iframe,
       messageHandler: (DebugInfo message) {
-        final tabId = message.tabId!;
-        setStorageObject(
-          type: StorageObject.debugInfo,
-          json: message.toJSON(),
-          tabId: tabId,
-        );
+        // setStorageObject(
+        //   type: StorageObject.debugInfo,
+        //   json: message.toJSON(),
+        //   tabId: tabId,
+        // );
       });
 }
 

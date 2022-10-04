@@ -16,6 +16,7 @@ class Chrome {
   external Scripting get scripting;
   external Storage get storage;
   external Tabs get tabs;
+  external WebNavigation get webNavigation;
 }
 
 @JS()
@@ -160,6 +161,36 @@ class RemoveInfo {
   external int get windowId;
   external bool get isWindowClosing;
 }
+
+@JS()
+@anonymous
+class WebNavigation {
+  // https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCommitted
+  external OnCommittedHandler get onCommitted;
+
+  external OnCommittedHandler get onBeforeNavigate;
+}
+
+
+@JS()
+@anonymous
+class OnCommittedHandler {
+  external void addListener(void Function(NavigationInfo details) callback);
+}
+
+@JS()
+@anonymous
+class NavigationInfo {
+  external String get transitionType;
+  external int get tabId;
+}
+
+// @JS()
+// @anonymous
+// class NavigationFilters {
+//   external String get transitionType;
+//   external int get tabId;
+// }
 
 @JS()
 @anonymous

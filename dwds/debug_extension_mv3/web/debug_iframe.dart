@@ -10,6 +10,7 @@ import 'dart:html';
 import 'dart:async';
 
 import 'package:built_collection/built_collection.dart';
+import 'package:dwds/data/connect_request.dart';
 import 'package:js/js.dart';
 import 'package:js/js_util.dart' as js_util;
 import 'package:dwds/data/devtools_request.dart';
@@ -42,6 +43,8 @@ DebugInfo? _debugInfo;
 late String tabId;
 late Debuggee debuggee;
 
+bool reconnecting = false;
+
 // WORKS WITH CHANGES IN a-new-client CITC client. / mv3-extension-connection
 
 void main() async {
@@ -69,7 +72,12 @@ void _maybeUpdateDebuggingState() async {
     type: StorageObject.debugState,
     tabId: tabId,
   );
-  if (debugStateJson == null) return;
+  if (debugStateJson == null) {
+    // send message to injected client to connect to the app
+    console.log('NOT CURRENTLY DEBUGGING, THEREFORE SENDING READY MESSAGE.');
+    _sendReadyMessageToInjectedClient();
+    return;
+  }
 
   final debugState = DebugState.fromJSON(debugStateJson);
   switch (debugState) {
@@ -77,6 +85,7 @@ void _maybeUpdateDebuggingState() async {
       _startDebugging();
       break;
     case DebugState.isDebugging:
+      window.console.log('Reconnect to DWDS.');
       _maybeReconnectToDwds();
       break;
     case DebugState.stopDebugging:
@@ -88,10 +97,25 @@ void _maybeUpdateDebuggingState() async {
   }
 }
 
+void _sendReadyMessageToInjectedClient() async {
+  final clientWindow = window.parent;
+  if (clientWindow == null) {
+    console.warn('Did not find IFRAME parent.');
+    return;
+  }
+  final debugInfo = await _getDebugInfo();
+  final clientOrigin = debugInfo.origin;
+  if (clientOrigin == null) {
+    console.warn('cannot send message without origin');
+    return;
+  }
+  clientWindow.postMessage('dart-extension-ready', clientOrigin);
+}
+
 void _maybeReconnectToDwds() {
   if (_debugSession != null) return;
   console.log('Reconnecting to DWDS...');
-  _connectToDwds();
+  _connectToDwds(reconnecting: true);
 }
 
 void _startDebugging() {
@@ -179,7 +203,7 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
   }
 }
 
-void _connectToDwds() async {
+void _connectToDwds({bool reconnecting = false}) async {
   final contextIdJson = await fetchStorageObjectJson(
     type: StorageObject.contextId,
     tabId: tabId,
@@ -219,6 +243,10 @@ void _connectToDwds() async {
     cancelOnError: true,
   );
 
+  if (reconnecting) {
+    console.log('RECONNECTING, THEREFORE SENDING READY MESSAGE');
+    _sendReadyMessageToInjectedClient();
+  }
     _sendDevToolsRequest(client, contextId);
 }
 
@@ -288,10 +316,13 @@ void _forwardDwdsEventToChromeDebugger(
 
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
+  console.log('FORWARDING ${message.command} TO DEBUGGER.');
+
   chrome.debugger
       .sendCommand(debuggee, message.command, js_util.jsify(params),
           allowInterop(([e]) {
     // No arguments indicate that an error occurred.
+    console.log('--- is response to ${message.command} null? ${e == null}');
     if (e == null) {
       client.sink
           .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
@@ -306,6 +337,17 @@ void _forwardDwdsEventToChromeDebugger(
             ..result = JSON.stringify(e)))));
     }
   }));
+}
+void _sendConnectRequest(SocketClient client) async {
+  final session = _debugSession;
+  if (session == null) return;
+  final debugInfo = await _getDebugInfo();
+
+  console.log('SENDING CONNECT REQUEST!');
+  client.sink.add(jsonEncode(serializers.serialize(ConnectRequest((b) => b
+    ..appId = debugInfo.appId
+    ..instanceId = debugInfo.instanceId
+    ..entrypointPath = debugInfo.entrypointPath))));
 }
 
 void _sendDevToolsRequest(SocketClient client, int contextId) async {

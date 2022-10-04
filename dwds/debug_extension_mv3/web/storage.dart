@@ -45,15 +45,15 @@ Future<bool> setStorageObject({
 }) {
   final storageKey = '$tabId-${type.keyName}';
   final map = <String, String>{storageKey: json};
-    final completer = new Completer<bool>();
+  final completer = new Completer<bool>();
   chrome.storage.local.set(jsify(map), allowInterop(() {
     console.log('--- setting { $storageKey: $json }.');
     if (callback != null) {
       callback();
     }
-        completer.complete(true);
+    completer.complete(true);
   }));
-    return completer.future;
+  return completer.future;
 }
 
 Future<String?> fetchStorageObjectJson({
