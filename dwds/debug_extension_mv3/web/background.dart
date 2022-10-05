@@ -106,11 +106,11 @@ void _handleRuntimeMessages(
         }
         // Inject the debug IFRAME:
         console.log('Injecting debug IFRAME into Dart app...');
-        _executeInjectorScript();
+        _executeIframeInjectorScript();
       });
 }
 
-Future<void> _executeInjectorScript() async {
+Future<void> _executeIframeInjectorScript() async {
   final tabId = await _getTabId();
   if (tabId != null) {
     chrome.scripting.executeScript(
