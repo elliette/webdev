@@ -20,13 +20,10 @@ void main() {
 
 void _registerListeners() {
   chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
-  // chrome.webNavigation.onCommitted
-  //     .addListener(allowInterop(_maybeReinjectIframe));
 
   // Detect clicks on the Dart Debug Extension icon.
   chrome.action.onClicked.addListener(allowInterop((_) async {
     final tabId = await _getTabId();
-    // _executeInjectorScript();
     setStorageObject(
       type: StorageObject.debugState,
       json: DebugState.startDebugging.toJSON(),
@@ -40,16 +37,6 @@ void _registerListeners() {
   // session:
   chrome.tabs.onRemoved.addListener(allowInterop(_detachDebuggerForTab));
 }
-
-// void _maybeReinjectIframe(NavigationInfo navigationInfo) async {
-//   if (['reload', 'typed'].contains(navigationInfo.transitionType)) {
-//     final json = await fetchStorageObjectJson(
-//         type: StorageObject.devToolsTab, tabId: '${navigationInfo.tabId}');
-//     if (json != null) {
-//       _executeInjectorScript();
-//     }
-//   }
-// }
 
 void _onDebuggerDetach(Debuggee source, String _) async {
   final isDartAppBeingDebugged = await _isDartAppBeingDebugged(source.tabId);
@@ -112,13 +99,13 @@ void _handleRuntimeMessages(
         final json = await fetchStorageObjectJson(
             type: StorageObject.debugInfo, tabId: id);
         if (json == message.toJSON()) {
-          console.log('Not setting debug info, already set.');
+          console.warn('Not setting debug info, already set.');
         } else {
           setStorageObject(
               type: StorageObject.debugInfo, json: message.toJSON(), tabId: id);
         }
         // Inject the debug IFRAME:
-        console.log('EXECUTING INJECTOR SCRIPT, WE HAVE A DART APP.');
+        console.log('Injecting debug IFRAME into Dart app...');
         _executeInjectorScript();
       });
 }

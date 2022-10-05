@@ -12,7 +12,6 @@ import 'package:js/js.dart';
 import 'dart:async';
 
 import 'chrome_api.dart';
-import 'web_api.dart';
 
 enum StorageObject {
   contextId,
@@ -47,7 +46,7 @@ Future<bool> setStorageObject({
   final map = <String, String>{storageKey: json};
   final completer = new Completer<bool>();
   chrome.storage.local.set(jsify(map), allowInterop(() {
-    console.log('--- setting { $storageKey: $json }.');
+    // console.log('--- setting { $storageKey: $json }.');
     if (callback != null) {
       callback();
     }
@@ -64,7 +63,7 @@ Future<String?> fetchStorageObjectJson({
   final completer = new Completer<String?>();
   chrome.storage.local.get([storageKey], allowInterop((Object result) {
     final json = getProperty(result, storageKey) as String?;
-    console.log('--- fetching { $storageKey: $json }.');
+    // console.log('--- fetching { $storageKey: $json }.');
     completer.complete(json);
   }));
   return completer.future;
@@ -77,7 +76,7 @@ Future<bool> removeStorageObject({
   final storageKey = '$tabId-${type.keyName}';
   final completer = new Completer<bool>();
   chrome.storage.local.remove([storageKey], allowInterop(() {
-    console.log('--- removed $storageKey.');
+    // console.log('--- removed $storageKey.');
     completer.complete(true);
   }));
   return completer.future;

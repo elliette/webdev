@@ -31,7 +31,6 @@ void _registerListeners() {
 
   document.addEventListener('dart-app-ready', (_) {
     debugInfo = getProperty(_, 'detail') as String?;
-    console.log('IN DETECTOR, debugInfo is $debugInfo');
     dartAppReady = true;
     _maybeSendDartReadyMessage();
   });

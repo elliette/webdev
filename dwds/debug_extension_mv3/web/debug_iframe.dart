@@ -45,8 +45,7 @@ late Debuggee debuggee;
 
 bool reconnecting = false;
 
-// WORKS WITH CHANGES IN a-new-client CITC client. / mv3-extension-connection
-
+// cl/478639188 / mv3-work 
 void main() async {
   final id = await _getTabId();
   if (id == null) {
@@ -74,7 +73,7 @@ void _maybeUpdateDebuggingState() async {
   );
   if (debugStateJson == null) {
     // send message to injected client to connect to the app
-    console.log('NOT CURRENTLY DEBUGGING, THEREFORE SENDING READY MESSAGE.');
+    console.log('[IFRAME] Not debugging, send ready message to injected client.');
     _sendReadyMessageToInjectedClient();
     return;
   }
@@ -85,7 +84,6 @@ void _maybeUpdateDebuggingState() async {
       _startDebugging();
       break;
     case DebugState.isDebugging:
-      window.console.log('Reconnect to DWDS.');
       _maybeReconnectToDwds();
       break;
     case DebugState.stopDebugging:
@@ -106,7 +104,7 @@ void _sendReadyMessageToInjectedClient() async {
   final debugInfo = await _getDebugInfo();
   final clientOrigin = debugInfo.origin;
   if (clientOrigin == null) {
-    console.warn('cannot send message without origin');
+    console.warn('Cannot send message without origin');
     return;
   }
   clientWindow.postMessage('dart-extension-ready', clientOrigin);
@@ -114,18 +112,15 @@ void _sendReadyMessageToInjectedClient() async {
 
 void _maybeReconnectToDwds() {
   if (_debugSession != null) return;
-  console.log('Reconnecting to DWDS...');
   _connectToDwds(reconnecting: true);
 }
 
 void _startDebugging() {
-  // chrome.debugger.onDetach.addListener(allowInterop(_onDebuggerDetach));
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.attach(debuggee, '1.3', allowInterop(_onDebuggerAttach));
 }
 
 void _stopDebugging() {
-  console.log('Stop debugging...');
   final session = _debugSession;
   if (session == null) return;
 
@@ -157,17 +152,6 @@ void _onDebuggerAttach() {
     }
   }));
 }
-
-// void _onDebuggerDetach(Debuggee source, String _) async {
-//   console.log('Debugger detached...');
-//   // if (tabId != '${source.tabId}') return;
-//   await removeStorageObject(type: StorageObject.devToolsTab, tabId: tabId);
-//   setStorageObject(
-//     type: StorageObject.debugState,
-//     json: DebugState.stopDebugging.toJSON(),
-//     tabId: tabId,
-//   );
-// }
 
 void _onDebuggerEvent(Debuggee source, String method, Object? params) {
   if (method == 'Runtime.executionContextCreated') {
@@ -244,10 +228,11 @@ void _connectToDwds({bool reconnecting = false}) async {
   );
 
   if (reconnecting) {
-    console.log('RECONNECTING, THEREFORE SENDING READY MESSAGE');
+    console.log('[IFRAME] Reconnected to DWDS, sending ready message to injected client.');
     _sendReadyMessageToInjectedClient();
-  }
+  } else {
     _sendDevToolsRequest(client, contextId);
+  }
 }
 
 void _routeDwdsEvent(String eventData, SocketClient client) async {
@@ -316,13 +301,12 @@ void _forwardDwdsEventToChromeDebugger(
 
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
-  console.log('FORWARDING ${message.command} TO DEBUGGER.');
+  console.log('[IFRAME] Forwarding ${message.command} to Chrome Debugger.');
 
   chrome.debugger
       .sendCommand(debuggee, message.command, js_util.jsify(params),
           allowInterop(([e]) {
     // No arguments indicate that an error occurred.
-    console.log('--- is response to ${message.command} null? ${e == null}');
     if (e == null) {
       client.sink
           .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
@@ -337,17 +321,6 @@ void _forwardDwdsEventToChromeDebugger(
             ..result = JSON.stringify(e)))));
     }
   }));
-}
-void _sendConnectRequest(SocketClient client) async {
-  final session = _debugSession;
-  if (session == null) return;
-  final debugInfo = await _getDebugInfo();
-
-  console.log('SENDING CONNECT REQUEST!');
-  client.sink.add(jsonEncode(serializers.serialize(ConnectRequest((b) => b
-    ..appId = debugInfo.appId
-    ..instanceId = debugInfo.instanceId
-    ..entrypointPath = debugInfo.entrypointPath))));
 }
 
 void _sendDevToolsRequest(SocketClient client, int contextId) async {
