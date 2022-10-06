@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-// @dart = 2.9
 
 import 'dart:async';
 
@@ -98,10 +97,10 @@ refresh: Performs a full page refresh.
     var pubspecLock = await readPubspecLock(configuration);
     // Forward remaining arguments as Build Options to the Daemon.
     // This isn't documented. Should it be advertised?
+    var extraArgs = argResults?.rest ?? [];
     var buildOptions = buildRunnerArgs(pubspecLock, configuration)
-      ..addAll(argResults.rest.where((arg) => arg.startsWith('-')).toList());
-    var directoryArgs =
-        argResults.rest.where((arg) => !arg.startsWith('-')).toList();
+      ..addAll(extraArgs.where((arg) => arg.startsWith('-')).toList());
+    var directoryArgs = extraArgs.where((arg) => !arg.startsWith('-')).toList();
     var targetPorts = parseDirectoryArgs(directoryArgs);
     validateLaunchApps(configuration.launchApps, targetPorts.keys);
 

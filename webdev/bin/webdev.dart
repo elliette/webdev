@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-// @dart = 2.9
 
 import 'dart:async';
 import 'dart:io';
@@ -16,7 +15,7 @@ import 'package:webdev/src/webdev_command_runner.dart';
 
 Future main(List<String> args) async {
   try {
-    exitCode = await run(args);
+    exitCode = await run(args) ?? ExitCode.unavailable.code;
   } on UsageException catch (e) {
     print(red.wrap(e.message));
     print(' ');
@@ -52,4 +51,4 @@ Future main(List<String> args) async {
   }
 }
 
-String get _boldApp => styleBold.wrap(appName);
+String get _boldApp => styleBold.wrap(appName) ?? appName;

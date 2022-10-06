@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-// @dart = 2.9
 
 import 'dart:async';
 import 'dart:io';
@@ -57,7 +56,7 @@ String _uriForLaunchApp(String launchApp, ServerManager serverManager) {
       .toString();
 }
 
-Future<Chrome> _startChrome(
+Future<Chrome?> _startChrome(
   Configuration configuration,
   ServerManager serverManager,
   BuildDaemonClient client,
@@ -99,7 +98,7 @@ Future<ServerManager> _startServerManager(
   for (var target in targetPorts.keys) {
     serverOptions.add(ServerOptions(
       configuration,
-      targetPorts[target],
+      targetPorts[target] as int,
       target,
       assetPort,
     ));
@@ -125,7 +124,7 @@ void _registerBuildTargets(
 ) {
   // Register a target for each serve target.
   for (var target in targetPorts.keys) {
-    OutputLocation outputLocation;
+    OutputLocation? outputLocation;
     if (configuration.outputPath != null &&
         (configuration.outputInput == null ||
             target == configuration.outputInput)) {
@@ -158,10 +157,10 @@ void _registerBuildTargets(
 class DevWorkflow {
   final _doneCompleter = Completer();
   final BuildDaemonClient _client;
-  final Chrome _chrome;
+  final Chrome? _chrome;
 
   final ServerManager serverManager;
-  StreamSubscription _resultsSub;
+  StreamSubscription? _resultsSub;
 
   final _wrapWidth = stdout.hasTerminal ? stdout.terminalColumns - 8 : 72;
 
@@ -208,8 +207,8 @@ class DevWorkflow {
   Future<void> shutDown() async {
     await _resultsSub?.cancel();
     await _chrome?.close();
-    await _client?.close();
-    await serverManager?.stop();
+    await _client.close();
+    await serverManager.stop();
     if (!_doneCompleter.isCompleted) _doneCompleter.complete();
   }
 }
