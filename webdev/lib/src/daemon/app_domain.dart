@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -93,10 +92,10 @@ class AppDomain extends Domain {
       var stdOutSub = vmService.onStdoutEvent.listen((log) {
         var bytes = log.bytes;
         if (bytes != null) {
-        sendEvent('app.log', {
-          'appId': appId,
-          'log': utf8.decode(base64.decode(bytes)),
-        });
+          sendEvent('app.log', {
+            'appId': appId,
+            'log': utf8.decode(base64.decode(bytes)),
+          });
         }
       });
       sendEvent('app.debugPort', {
