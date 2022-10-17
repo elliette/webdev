@@ -18,6 +18,7 @@ import 'package:dwds/data/extension_request.dart';
 import 'package:dwds/data/serializers.dart';
 import 'package:dwds/src/sockets.dart';
 import 'package:sse/client/sse_client.dart';
+import 'package:sse/src/util/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'chrome_api.dart';
@@ -187,6 +188,24 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
   }
 }
 
+Future<String> _fetchDebugConnectionId() async {
+  final debugConnectionIdJson = await fetchStorageObjectJson(
+    type: StorageObject.debugConnectionId,
+    tabId: tabId,
+  );
+  if (debugConnectionIdJson == null) {
+    final id = generateUuidV4();
+    final json = DebugConnectionId(debugConnectionId: id).toJSON();
+    await setStorageObject(type: StorageObject.debugConnectionId, json: json, tabId: tabId);
+    console.log('CREATED NEW DEBUG CONNECTION ID $id');
+    return id;
+  }
+
+  final id = DebugConnectionId.fromJSON(debugConnectionIdJson).debugConnectionId;
+  console.log('RETURNING EXISTING DEBUG CONNECTION ID $id');
+  return id;
+}
+
 void _connectToDwds({bool reconnecting = false}) async {
   final contextIdJson = await fetchStorageObjectJson(
     type: StorageObject.contextId,
@@ -196,6 +215,7 @@ void _connectToDwds({bool reconnecting = false}) async {
     console.warn('Can\'t connect to DWDS without a context ID.');
     return;
   }
+
   final contextId = ContextId.fromJSON(contextIdJson).contextId;
   final debugInfo = await _getDebugInfo();
   final extensionUri = debugInfo.extensionUri;
@@ -204,9 +224,10 @@ void _connectToDwds({bool reconnecting = false}) async {
   final uri = Uri.parse(extensionUri);
   final authenticated = await _authenticateUser(uri);
   if (!authenticated) return;
+  final debugConnectionId = await _fetchDebugConnectionId();
   final client = uri.isScheme('ws') || uri.isScheme('wss')
       ? WebSocketClient(WebSocketChannel.connect(uri))
-      : SseSocketClient(SseClient(uri.toString()));
+      : SseSocketClient(SseClient(uri.toString(), id: debugConnectionId, debugKey: 'DebugExtension'));
   _debugSession = DebugSession(client, int.parse(tabId), debugInfo.appId!);
   setStorageObject(
     type: StorageObject.debugState,

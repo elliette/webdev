@@ -17,6 +17,7 @@ enum StorageObject {
   contextId,
   dartTab,
   devToolsTab,
+  debugConnectionId,
   debugState,
   debugInfo;
 
@@ -28,6 +29,8 @@ enum StorageObject {
         return 'dartTabJson';
       case StorageObject.devToolsTab:
         return 'devToolsTabJson';
+      case StorageObject.debugConnectionId:
+        return 'debugConnectionId';
       case StorageObject.debugInfo:
         return 'debugInfoJson';
       case StorageObject.debugState:
@@ -129,3 +132,28 @@ class DevToolsTab {
     return jsonEncode({'tabId': tabId, 'tabUrl': tabUrl});
   }
 }
+
+@JS()
+@anonymous
+class DebugConnectionIdStorageObject {
+  external String? get debugConnectionIdJson;
+  external factory DebugConnectionIdStorageObject({String debugConnectionIdJson});
+}
+
+class DebugConnectionId {
+  final String debugConnectionId;
+
+  DebugConnectionId({required this.debugConnectionId});
+
+  factory DebugConnectionId.fromJSON(String json) {
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final debugConnectionId = decoded['debugConnectionId'] as String;
+    return DebugConnectionId(debugConnectionId: debugConnectionId);
+  }
+
+  String toJSON() {
+    return jsonEncode({'debugConnectionId': debugConnectionId});
+  }
+}
+
+
