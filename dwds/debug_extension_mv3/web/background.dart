@@ -85,9 +85,6 @@ void _handleRuntimeMessages(
     dynamic jsRequest, MessageSender sender, Function sendResponse) async {
   if (jsRequest is! String) return;
 
-  final tabId = await _getTabId();
-  if (tabId == null) return;
-  final id = '${tabId}';
 
   interceptMessage<DebugInfo>(
       message: jsRequest,
@@ -95,6 +92,24 @@ void _handleRuntimeMessages(
       expectedSender: Script.detector,
       expectedRecipient: Script.background,
       messageHandler: (DebugInfo message) async {
+
+      final tabId = await _getTabId();
+      if (tabId == null) return;
+      final id = '${tabId}';
+
+      final tab = await promiseToFuture<Tab?>(chrome.tabs.get(tabId));
+      final tabUrl = tab?.url ?? '';
+      final origin = message.origin ?? '';
+      // Might want to change the logic here. If you switch tabs while it loads this won't work.
+      if (tabUrl.isEmpty || origin.isEmpty || !tabUrl.startsWith(origin)) {
+        console.warn('Current active tab is not ${message.origin}.');
+        console.log(tabUrl);
+        console.log('vs');
+        console.log(message.origin ?? '');
+        return;
+      }
+
+
         chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
         final json = await fetchStorageObjectJson(
             type: StorageObject.debugInfo, tabId: id);
@@ -106,19 +121,19 @@ void _handleRuntimeMessages(
         }
         // Inject the debug IFRAME:
         console.log('Injecting debug IFRAME into Dart app...');
-        _executeIframeInjectorScript();
+        _executeIframeInjectorScript(tabId);
       });
 }
 
-Future<void> _executeIframeInjectorScript() async {
-  final tabId = await _getTabId();
-  if (tabId != null) {
+Future<void> _executeIframeInjectorScript(int tabId) async {
+  // final tabId = await _getTabId();
+  // if (tabId != null) {
     chrome.scripting.executeScript(
       InjectDetails(
           target: Target(tabId: tabId), files: ['iframe_injector.dart.js']),
       /*callback*/ null,
     );
-  }
+  // }
 }
 
 Future<int?> _getTabId() async {

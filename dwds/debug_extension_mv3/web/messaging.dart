@@ -177,6 +177,7 @@ class DebugInfo {
   final String? appId;
   final String? instanceId;
   final String? entrypointPath;
+  final int? tabId;
 
   DebugInfo({
     this.origin,
@@ -184,6 +185,7 @@ class DebugInfo {
     this.appId,
     this.instanceId,
     this.entrypointPath,
+    this.tabId,
   });
 
   factory DebugInfo.fromJSON(String json) {
@@ -193,12 +195,14 @@ class DebugInfo {
     final appId = decoded['appId'] as String?;
     final instanceId = decoded['instanceId'] as String?;
     final entrypointPath = decoded['entrypointPath'] as String?;
+    final tabId = decoded['tabId'] as int?;
     return DebugInfo(
       origin: origin,
       extensionUri: extensionUri,
       appId: appId,
       instanceId: instanceId,
       entrypointPath: entrypointPath,
+      tabId: tabId,
     );
   }
 
@@ -209,6 +213,7 @@ class DebugInfo {
       'appId': appId,
       'instanceId': instanceId,
       'entrypointPath': entrypointPath,
+      'tabId': tabId,
     });
   }
 }

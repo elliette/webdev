@@ -46,7 +46,9 @@ late Debuggee debuggee;
 
 bool reconnecting = false;
 
-// cl/478639188 / mv3-work 
+int? _contextId;
+
+// cl/478639188 / mv3-work
 void main() async {
   final id = await _getTabId();
   if (id == null) {
@@ -74,7 +76,8 @@ void _maybeUpdateDebuggingState() async {
   );
   if (debugStateJson == null) {
     // send message to injected client to connect to the app
-    console.log('[IFRAME] Not debugging, send ready message to injected client.');
+    console
+        .log('[IFRAME] Not debugging, send ready message to injected client.');
     _sendReadyMessageToInjectedClient();
     return;
   }
@@ -113,12 +116,41 @@ void _sendReadyMessageToInjectedClient() async {
 
 void _maybeReconnectToDwds() {
   if (_debugSession != null) return;
-  _connectToDwds(reconnecting: true);
+
+  reconnecting = true;
+  console.log('Reconnecting to DWDS / debugger...');
+
+  chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
+
+  chrome.debugger.sendCommand(debuggee, 'Runtime.disable', EmptyParam(),
+      allowInterop((_) {
+    console.log('Set runtime disable to true.');
+    final chromeError = chrome.runtime.lastError;
+    if (chromeError != null) {
+      window.alert(_translateChromeError(chromeError.message));
+      return;
+    }
+
+    chrome.debugger.sendCommand(debuggee, 'Runtime.enable', EmptyParam(),
+        allowInterop((_) {
+      console.log('Not setting runtime  enable  to true.');
+      final chromeError = chrome.runtime.lastError;
+      if (chromeError != null) {
+        window.alert(_translateChromeError(chromeError.message));
+        return;
+      }
+    }));
+  }));
+
+  // _connectToDwds();
 }
 
 void _startDebugging() {
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.attach(debuggee, '1.3', allowInterop(_onDebuggerAttach));
+  chrome.debugger.onDetach.addListener((Debuggee source, String reason) {
+    console.log('-------- DEBUGGER DETACHED DUE TO $reason.');
+  });
 }
 
 void _stopDebugging() {
@@ -154,11 +186,18 @@ void _onDebuggerAttach() {
   }));
 }
 
+void _listenForExecutionContextCreated(
+    Debuggee source, String method, Object? params) {
+  if (method == 'Runtime.executionContextCreated') {
+    _handleExecutionContextCreated(source, params);
+  }
+}
+
 void _onDebuggerEvent(Debuggee source, String method, Object? params) {
   if (method == 'Runtime.executionContextCreated') {
     _handleExecutionContextCreated(source, params);
   }
-
+  
   _forwardChromeDebuggerEventToDwds(source, method, params);
 }
 
@@ -176,10 +215,20 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
 
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String;
+  // console.log('Execution context created for $contextOrigin');
+  final debugInfoExists = await _debugInfoExists();
+  if (!debugInfoExists) {
+    console.log(
+        'Received execution context for $contextOrigin but debug info is null.');
+    return;
+  }
+
   final debugInfo = await _getDebugInfo();
   if (contextOrigin == debugInfo.origin) {
     final contextId = context['id'] as int;
-    setStorageObject(
+    console.log('=== Setting new context ID $contextId for $contextOrigin');
+    _contextId = contextId;
+    await setStorageObject(
       type: StorageObject.contextId,
       json: ContextId(contextId: contextId).toJSON(),
       tabId: tabId,
@@ -196,17 +245,19 @@ Future<String> _fetchDebugConnectionId() async {
   if (debugConnectionIdJson == null) {
     final id = generateUuidV4();
     final json = DebugConnectionId(debugConnectionId: id).toJSON();
-    await setStorageObject(type: StorageObject.debugConnectionId, json: json, tabId: tabId);
+    await setStorageObject(
+        type: StorageObject.debugConnectionId, json: json, tabId: tabId);
     console.log('CREATED NEW DEBUG CONNECTION ID $id');
     return id;
   }
 
-  final id = DebugConnectionId.fromJSON(debugConnectionIdJson).debugConnectionId;
+  final id =
+      DebugConnectionId.fromJSON(debugConnectionIdJson).debugConnectionId;
   console.log('RETURNING EXISTING DEBUG CONNECTION ID $id');
   return id;
 }
 
-void _connectToDwds({bool reconnecting = false}) async {
+void _connectToDwds() async {
   final contextIdJson = await fetchStorageObjectJson(
     type: StorageObject.contextId,
     tabId: tabId,
@@ -227,7 +278,8 @@ void _connectToDwds({bool reconnecting = false}) async {
   final debugConnectionId = await _fetchDebugConnectionId();
   final client = uri.isScheme('ws') || uri.isScheme('wss')
       ? WebSocketClient(WebSocketChannel.connect(uri))
-      : SseSocketClient(SseClient(uri.toString(), id: debugConnectionId, debugKey: 'DebugExtension'));
+      : SseSocketClient(SseClient(uri.toString(),
+          id: debugConnectionId, debugKey: 'DebugExtension'));
   _debugSession = DebugSession(client, int.parse(tabId), debugInfo.appId!);
   setStorageObject(
     type: StorageObject.debugState,
@@ -249,10 +301,15 @@ void _connectToDwds({bool reconnecting = false}) async {
   );
 
   if (reconnecting) {
-    console.log('[IFRAME] Reconnected to DWDS, sending ready message to injected client.');
+    console.log(
+        '[IFRAME] Reconnected to DWDS, sending ready message to injected client.');
     _sendReadyMessageToInjectedClient();
+    console.log('Sending devtools reqeust with context id: $_contextId');
+    _sendDevToolsRequest(client, _contextId!);
+
   } else {
-    _sendDevToolsRequest(client, contextId);
+    console.log('NOT RECONNECTING....');
+    _sendDevToolsRequest(client, _contextId!);
   }
 }
 
@@ -322,18 +379,29 @@ void _forwardDwdsEventToChromeDebugger(
 
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
-  console.log('[IFRAME] Forwarding ${message.command} to Chrome Debugger.');
+  console.log(
+      '[[[IFRAME]]] Forwarding ${message.command} with ID ${message.id} to Chrome Debugger.');
 
-  chrome.debugger
-      .sendCommand(debuggee, message.command, js_util.jsify(params),
-          allowInterop(([e]) {
+  if (params['contextId'] != null) {
+    
+    final id = params['contextId'];
+    console.log('~~~ received $id but actual context id is $_contextId');
+    params['contextId'] = _contextId!;
+  }
+
+  chrome.debugger.sendCommand(debuggee, message.command, js_util.jsify(params),
+      allowInterop(([e]) {
     // No arguments indicate that an error occurred.
+    console.log('             Response from Chrome Debugger is $e');
     if (e == null) {
+      final error = chrome.runtime.lastError;
+      final errorMessage = error?.message ?? '';
+      console.log('!!! ERROR MESSAGE IS: $errorMessage');
       client.sink
           .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
             ..id = message.id
             ..success = false
-            ..result = JSON.stringify(chrome.runtime.lastError)))));
+            ..result = JSON.stringify(error)))));
     } else {
       client.sink
           .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
@@ -418,6 +486,13 @@ Future<int?> _getTabId() async {
   final tabs = List<Tab>.from(await promiseToFuture(chrome.tabs.query(query)));
   final tab = tabs.isNotEmpty ? tabs.first : null;
   return tab?.id;
+}
+
+Future<bool> _debugInfoExists() async {
+  if (_debugInfo != null) return true;
+  final debugInfoJson =
+      await fetchStorageObjectJson(type: StorageObject.debugInfo, tabId: tabId);
+  return debugInfoJson != null;
 }
 
 Future<DebugInfo> _getDebugInfo() async {
