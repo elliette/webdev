@@ -525,7 +525,7 @@ Future<void> _startSseClient(
   // A debugger is detached if it is closed by user or the target is closed.
   final client = uri.isScheme('ws') || uri.isScheme('wss')
       ? WebSocketClient(WebSocketChannel.connect(uri))
-      : SseSocketClient(SseClient(uri.toString()));
+      : SseSocketClient(SseClient(uri.toString(), debugKey: 'DebugExtension'));
   _debugSessions.add(DebugSession(client, currentTab.id, appId));
   print('Connected to DWDS version $dwdsVersion with appId=$appId');
   client.stream.listen((data) {
