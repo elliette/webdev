@@ -55,7 +55,7 @@ class DebugSession {
   }
 
   void close() {
-    console.warn('======= CLOSING SOCKET CLIENT. =========');
+    console.warn('[[IFRAME]] Closing socket client.');
     _socketClient.close();
     _batchSubscription.cancel();
     _batchController.close();

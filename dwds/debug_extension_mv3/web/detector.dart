@@ -14,7 +14,7 @@ import 'messaging.dart';
 import 'web_api.dart';
 
 bool dartAppReady = false;
-bool isLoaded = false;
+// bool isLoaded = false;
 String? debugInfo;
 
 void main() {
@@ -22,14 +22,15 @@ void main() {
 }
 
 void _registerListeners() {
-  document.onReadyStateChange.listen((_) {
-    if (isLoaded) return;
-    if (document.readyState != 'complete') return;
-    isLoaded = true;
-    _maybeSendDartReadyMessage();
-  });
+  // document.onReadyStateChange.listen((_) {
+  //   if (isLoaded) return;
+  //   if (document.readyState != 'complete') return;
+  //   isLoaded = true;
+  //   _maybeSendDartReadyMessage();
+  // });
 
   document.addEventListener('dart-app-ready', (_) {
+    console.log('received dart app ready event');
     debugInfo = getProperty(_, 'detail') as String?;
     dartAppReady = true;
     _maybeSendDartReadyMessage();
@@ -37,7 +38,7 @@ void _registerListeners() {
 }
 
 void _maybeSendDartReadyMessage() async {
-  if (isLoaded && dartAppReady) {
+  if (dartAppReady) {
     if (debugInfo == null) {
       console.warn('Can\'t debug without debug info.');
       return;

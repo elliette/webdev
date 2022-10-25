@@ -45,6 +45,7 @@ late String tabId;
 late Debuggee debuggee;
 
 bool reconnecting = false;
+final eventsCache = <ExtensionEvent>[];
 
 int? _contextId;
 
@@ -204,9 +205,18 @@ void _onDebuggerEvent(Debuggee source, String method, Object? params) {
 void _forwardChromeDebuggerEventToDwds(
     Debuggee source, String method, dynamic params) async {
   final session = _debugSession;
-  if (session == null) return;
+  if (session == null) {
+    if (reconnecting) {
+      console.log('[[IFRAME]] Reconnecting, therefore adding $method to events cache.');
+      eventsCache.add(_extensionEventFor(method, params));
+      return;
+    }
+    console.warn('[[IFRAME]] Not sending $method to DWDS, debug session is null');
+    return;
+  }
 
   final event = _extensionEventFor(method, params);
+  console.log('[[IFRAME]] Sending $method to DWDS.');
   session.sendEvent(event);
 }
 
@@ -218,15 +228,16 @@ void _handleExecutionContextCreated(Debuggee source, Object? params) async {
   // console.log('Execution context created for $contextOrigin');
   final debugInfoExists = await _debugInfoExists();
   if (!debugInfoExists) {
-    console.log(
-        'Received execution context for $contextOrigin but debug info is null.');
+    console.warn(
+        '[[IFRAME]] Received execution context for $contextOrigin but debug info is null.');
     return;
   }
 
   final debugInfo = await _getDebugInfo();
   if (contextOrigin == debugInfo.origin) {
     final contextId = context['id'] as int;
-    console.log('=== Setting new context ID $contextId for $contextOrigin');
+    if (contextId == _contextId) return;
+    console.log('[[IFRAME]] Setting new context ID $contextId for $contextOrigin');
     _contextId = contextId;
     await setStorageObject(
       type: StorageObject.contextId,
@@ -247,17 +258,22 @@ Future<String> _fetchDebugConnectionId() async {
     final json = DebugConnectionId(debugConnectionId: id).toJSON();
     await setStorageObject(
         type: StorageObject.debugConnectionId, json: json, tabId: tabId);
-    console.log('CREATED NEW DEBUG CONNECTION ID $id');
+    console.log('[[IFRAME]] Created new SSE ID: $id');
     return id;
   }
 
   final id =
       DebugConnectionId.fromJSON(debugConnectionIdJson).debugConnectionId;
-  console.log('RETURNING EXISTING DEBUG CONNECTION ID $id');
+  console.log('[[IFRAME]] Returning existing SSE ID: $id');
   return id;
 }
 
 void _connectToDwds() async {
+  if (_debugSession != null) {
+    console.log('[[IFRAME]] Already have a debug session, not connecting to DWDS.');
+  }
+
+
   final contextIdJson = await fetchStorageObjectJson(
     type: StorageObject.contextId,
     tabId: tabId,
@@ -267,7 +283,7 @@ void _connectToDwds() async {
     return;
   }
 
-  final contextId = ContextId.fromJSON(contextIdJson).contextId;
+  // final contextId = ContextId.fromJSON(contextIdJson).contextId;
   final debugInfo = await _getDebugInfo();
   final extensionUri = debugInfo.extensionUri;
   if (extensionUri == null) return;
@@ -301,14 +317,21 @@ void _connectToDwds() async {
   );
 
   if (reconnecting) {
+    reconnecting = false;
+    eventsCache.forEach((event) {
+      console.log('[IFRAME] Sending message in cache...');
+      _debugSession!.sendEvent(event);
+    });
+    eventsCache.clear();
     console.log(
         '[IFRAME] Reconnected to DWDS, sending ready message to injected client.');
     _sendReadyMessageToInjectedClient();
-    console.log('Sending devtools reqeust with context id: $_contextId');
-    _sendDevToolsRequest(client, _contextId!);
+
+    // console.log('Sending devtools reqeust with context id: $_contextId');
+    // _sendDevToolsRequest(client, _contextId!);
 
   } else {
-    console.log('NOT RECONNECTING....');
+  console.log('NOT RECONNECTING, SENDING DEVTOOLS REQUEST....');
     _sendDevToolsRequest(client, _contextId!);
   }
 }
@@ -379,24 +402,23 @@ void _forwardDwdsEventToChromeDebugger(
 
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
-  console.log(
-      '[[[IFRAME]]] Forwarding ${message.command} with ID ${message.id} to Chrome Debugger.');
-
   if (params['contextId'] != null) {
-    
-    final id = params['contextId'];
-    console.log('~~~ received $id but actual context id is $_contextId');
-    params['contextId'] = _contextId!;
+    final ctxId = params['contextId'];
+    if (ctxId != _contextId!) {
+      console.log(
+          '[[[IFRAME]]] NOT forwarding MSG #${message.id} ${message.command} to Chrome Debugger. Expected context $_contextId but received $ctxId');
+      return;
+    }
   }
-
+  console.log(
+      '[[[IFRAME]]] Forwarding MSG #${message.id} ${message.command} to Chrome Debugger.');
   chrome.debugger.sendCommand(debuggee, message.command, js_util.jsify(params),
       allowInterop(([e]) {
     // No arguments indicate that an error occurred.
-    console.log('             Response from Chrome Debugger is $e');
     if (e == null) {
       final error = chrome.runtime.lastError;
       final errorMessage = error?.message ?? '';
-      console.log('!!! ERROR MESSAGE IS: $errorMessage');
+      console.warn('[[[IFRAME]]] Error from Chrome Debugger is $errorMessage');
       client.sink
           .add(jsonEncode(serializers.serialize(ExtensionResponse((b) => b
             ..id = message.id
