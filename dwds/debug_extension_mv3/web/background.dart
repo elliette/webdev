@@ -5,6 +5,7 @@
 @JS()
 library background;
 
+import 'dart:async';
 import 'dart:html';
 
 import 'package:dwds/data/debug_info.dart';
@@ -12,6 +13,7 @@ import 'package:js/js.dart';
 
 import 'chrome_api.dart';
 import 'data_types.dart';
+import 'lifeline_ports.dart';
 import 'messaging.dart';
 import 'storage.dart';
 import 'web_api.dart';
@@ -22,13 +24,16 @@ void main() {
 
 void _registerListeners() {
   chrome.runtime.onMessage.addListener(allowInterop(_handleRuntimeMessages));
+  chrome.tabs.onRemoved
+      .addListener(allowInterop((tabId, _) => maybeRemoveLifelinePort(tabId)));
 
   // Detect clicks on the Dart Debug Extension icon.
   chrome.action.onClicked.addListener(allowInterop(_startDebugSession));
 }
 
-Future<void> _startDebugSession(Tab _) async {
-  // TODO(elliette): Start a debug session instead.
+// TODO(elliette): Start a debug session instead.
+Future<void> _startDebugSession(Tab currentTab) async {
+  maybeCreateLifelinePort(currentTab.id);
   final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
       type: StorageObject.devToolsOpener);
   await _createTab('https://dart.dev/',
@@ -48,11 +53,19 @@ void _handleRuntimeMessages(
         final currentTab = await _getTab();
         final currentUrl = currentTab?.url ?? '';
         final appUrl = debugInfo.appUrl ?? '';
-        if (currentUrl.isEmpty || appUrl.isEmpty || currentUrl != appUrl) {
+        if (currentTab == null ||
+            currentUrl.isEmpty ||
+            appUrl.isEmpty ||
+            currentUrl != appUrl) {
           console.warn(
               'Dart app detected at $appUrl but current tab is $currentUrl.');
           return;
         }
+        // Save the debug info for the Dart app in storage:
+        await setStorageObject<DebugInfo>(
+            type: StorageObject.debugInfo,
+            value: debugInfo,
+            tabId: currentTab.id);
         // Update the icon to show that a Dart app has been detected:
         chrome.action.setIcon(IconInfo(path: 'dart.png'), /*callback*/ null);
       });
