@@ -82,6 +82,9 @@ class Debuggee {
 @JS()
 @anonymous
 class Runtime {
+  // Note: Not checking the lastError when one occurs throws a runtime exception.
+  external ChromeError? get lastError;
+
   external void connect(String? extensionId, ConnectInfo info);
 
   external void sendMessage(
@@ -90,6 +93,11 @@ class Runtime {
   external ConnectionHandler get onConnect;
 
   external OnMessageHandler get onMessage;
+}
+
+@JS()
+class ChromeError {
+  external String get message;
 }
 
 @JS()

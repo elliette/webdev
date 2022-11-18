@@ -6,6 +6,7 @@
 library background;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html';
 
 import 'package:dwds/data/debug_info.dart';
@@ -41,20 +42,33 @@ void _registerListeners() {
       .addListener(allowInterop((tabId, _) => maybeRemoveLifelinePort(tabId)));
 
   // Detect clicks on the Dart Debug Extension icon.
-  chrome.action.onClicked.addListener(allowInterop(_startDebugSession));
+  chrome.action.onClicked.addListener(allowInterop(_maybeAttachDebugger));
 }
 
-// TODO(elliette): Start a debug session instead.
-Future<void> _startDebugSession(Tab currentTab) async {
+Future<void> _maybeAttachDebugger(Tab currentTab) async {
+  final tabId = currentTab.id;
+  final debugInfo = await fetchStorageObject<DebugInfo>(
+    type: StorageObject.debugInfo,
+    tabId: tabId,
+  );
+  if (debugInfo == null) {
+    console.warn('Current tab is not debuggable.');
+    return;
+  }
+  maybeCreateLifelinePort(tabId);
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.attach(
-      Debuggee(tabId: _tabId), '1.3', allowInterop(_onDebuggerAttached));
+    Debuggee(tabId: tabId),
+    '1.3',
+    allowInterop(
+      () => _enableExecutionContextReporting(tabId),
+    ),
+  );
 
-  maybeCreateLifelinePort(currentTab.id);
-  final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
-      type: StorageObject.devToolsOpener);
-  await _createTab('https://dart.dev/',
-      inNewWindow: devToolsOpener?.newWindow ?? false);
+  // final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
+  //     type: StorageObject.devToolsOpener);
+  // await _createTab('https://dart.dev/',
+  //     inNewWindow: devToolsOpener?.newWindow ?? false);
 }
 
 void _handleRuntimeMessages(
@@ -96,10 +110,12 @@ void _onDebuggerEvent(Debuggee source, String method, Object? params) {
   _forwardChromeDebuggerEventToDwds(source, method, params);
 }
 
-_onDebuggerAttached() {
-  chrome.debugger
-      .sendCommand(Debuggee(tabId: _tabId), 'Runtime.enable', EmptyParam(),
-          allowInterop((_) {
+_enableExecutionContextReporting(int tabId) {
+  // Runtime.enable enables reporting of execution contexts creation by means of
+  // executionContextCreated event. When the reporting gets enabled the event
+  // will be sent immediately for each existing execution context:
+  chrome.debugger.sendCommand(
+      Debuggee(tabId: tabId), 'Runtime.enable', EmptyParam(), allowInterop((_) {
     final chromeError = chrome.runtime.lastError;
     if (chromeError != null) {
       window.alert(_translateChromeError(chromeError.message));
@@ -272,4 +288,10 @@ Future<Tab> _createTab(String url, {bool inNewWindow = false}) async {
     url: url,
   ));
   return promiseToFuture<Tab>(tabPromise);
+}
+
+@JS()
+@anonymous
+class EmptyParam {
+  external factory EmptyParam();
 }
