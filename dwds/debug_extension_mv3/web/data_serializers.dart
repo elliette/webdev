@@ -15,5 +15,9 @@ part 'data_serializers.g.dart';
 @SerializersFor([
   DebugInfo,
   DevToolsOpener,
+  DevToolsRequest,
+  ExtensionEvent,
+  ExtensionRequest,
+  ExtensionResponse,
 ])
 final Serializers serializers = _$serializers;

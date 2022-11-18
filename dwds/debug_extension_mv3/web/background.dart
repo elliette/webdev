@@ -45,6 +45,7 @@ void _registerListeners() {
   chrome.action.onClicked.addListener(allowInterop(_maybeAttachDebugger));
 }
 
+<<<<<<< HEAD
 Future<void> _maybeAttachDebugger(Tab currentTab) async {
   final tabId = currentTab.id;
   final debugInfo = await fetchStorageObject<DebugInfo>(
