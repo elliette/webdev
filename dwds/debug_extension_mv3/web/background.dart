@@ -18,6 +18,19 @@ import 'messaging.dart';
 import 'storage.dart';
 import 'web_api.dart';
 
+const _authenticationPath = '\$dwdsExtensionAuthentication';
+
+const _notADartAppAlert = 'No Dart application detected.'
+    ' Are you trying to debug an application that includes a Chrome hosted app'
+    ' (an application listed in chrome://apps)? If so, debugging is disabled.'
+    ' You can fix this by removing the application from chrome://apps. Please'
+    ' see https://bugs.chromium.org/p/chromium/issues/detail?id=885025#c11.';
+
+const _devToolsAlreadyOpenedAlert =
+    'DevTools is already opened on a different window.';
+
+final _debugSessions = <DebugSession>[];
+
 void main() {
   _registerListeners();
 }
@@ -33,6 +46,10 @@ void _registerListeners() {
 
 // TODO(elliette): Start a debug session instead.
 Future<void> _startDebugSession(Tab currentTab) async {
+  chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
+  chrome.debugger.attach(
+      Debuggee(tabId: _tabId), '1.3', allowInterop(_onDebuggerAttached));
+
   maybeCreateLifelinePort(currentTab.id);
   final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
       type: StorageObject.devToolsOpener);
