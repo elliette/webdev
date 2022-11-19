@@ -18,6 +18,10 @@ import 'web_api.dart';
 /// Switch to true for debug logging.
 bool enableDebugLogging = true;
 
+/// Cache for faster retrieval of storage objects. If an object is not in the
+/// cache, then we make a request to chrome.storage.
+final _storageObjectCache = <String, String>{};
+
 enum StorageObject {
   debugInfo,
   devToolsOpener;
@@ -46,6 +50,7 @@ Future<bool> setStorageObject<T>({
     if (callback != null) {
       callback();
     }
+    _storageObjectCache[storageKey] = json;
     _debugLog(storageKey, 'Set: $json');
     completer.complete(true);
   }));
@@ -55,18 +60,31 @@ Future<bool> setStorageObject<T>({
 Future<T?> fetchStorageObject<T>({required StorageObject type, int? tabId}) {
   final storageKey = _createStorageKey(type, tabId);
   final completer = Completer<T?>();
+  // If we have the storage object in the cache, then fetch it from cache:
+  final cacheValue = _storageObjectCache[storageKey];
+  if (cacheValue != null) {
+    final storageValue = _convertFromJson<T>(cacheValue);
+    _debugLog(storageKey, 'Fetched from cache: $cacheValue');
+    completer.complete(storageValue);
+    return completer.future;
+  }
+  // Otherwise fetch it from the extension storage:
   chrome.storage.local.get([storageKey], allowInterop((Object storageObj) {
     final json = getProperty(storageObj, storageKey) as String?;
     if (json == null) {
       _debugWarn(storageKey, 'Does not exist.');
       completer.complete(null);
     } else {
-      final value = serializers.deserialize(jsonDecode(json)) as T;
+      final value = _convertFromJson(json) as T;
       _debugLog(storageKey, 'Fetched: $json');
       completer.complete(value);
     }
   }));
   return completer.future;
+}
+
+T _convertFromJson<T>(String json) {
+  return serializers.deserialize(jsonDecode(json)) as T;
 }
 
 String _createStorageKey(StorageObject type, int? tabId) {

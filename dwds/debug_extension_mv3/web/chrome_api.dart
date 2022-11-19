@@ -123,27 +123,6 @@ class ConnectionHandler {
 
 @JS()
 @anonymous
-class ConnectInfo {
-  external String? get name;
-  external factory ConnectInfo({String? name});
-}
-
-@JS()
-@anonymous
-class Port {
-  external String? get name;
-  external void disconnect();
-  external ConnectionHandler get onDisconnect;
-}
-
-@JS()
-@anonymous
-class ConnectionHandler {
-  external void addListener(void Function(Port) callback);
-}
-
-@JS()
-@anonymous
 class OnMessageHandler {
   external void addListener(
       void Function(dynamic, MessageSender, Function) callback);
@@ -217,6 +196,8 @@ class Tabs {
   external Object query(QueryInfo queryInfo);
 
   external Object create(TabInfo tabInfo);
+
+  external Object get(int tabId);
 
   external OnRemovedHandler get onRemoved;
 }

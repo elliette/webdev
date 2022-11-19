@@ -9,11 +9,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:html';
 
+import 'package:built_collection/built_collection.dart';
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:dwds/data/debug_info.dart';
+import 'package:dwds/data/devtools_request.dart';
+import 'package:dwds/data/extension_request.dart';
+import 'package:dwds/src/sockets.dart';
 import 'package:js/js.dart';
+import 'package:js/js_util.dart' as jsUtil;
+import 'package:sse/client/sse_client.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'chrome_api.dart';
+import 'data_serializers.dart';
 import 'data_types.dart';
+import 'debug_session.dart';
 import 'lifeline_ports.dart';
 import 'messaging.dart';
 import 'storage.dart';
@@ -45,7 +55,6 @@ void _registerListeners() {
   chrome.action.onClicked.addListener(allowInterop(_maybeAttachDebugger));
 }
 
-<<<<<<< HEAD
 Future<void> _maybeAttachDebugger(Tab currentTab) async {
   final tabId = currentTab.id;
   final debugInfo = await fetchStorageObject<DebugInfo>(
@@ -65,11 +74,6 @@ Future<void> _maybeAttachDebugger(Tab currentTab) async {
       () => _enableExecutionContextReporting(tabId),
     ),
   );
-
-  // final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
-  //     type: StorageObject.devToolsOpener);
-  // await _createTab('https://dart.dev/',
-  //     inNewWindow: devToolsOpener?.newWindow ?? false);
 }
 
 void _handleRuntimeMessages(
@@ -103,9 +107,9 @@ void _handleRuntimeMessages(
       });
 }
 
-void _onDebuggerEvent(Debuggee source, String method, Object? params) {
+void _onDebuggerEvent(Debuggee source, String method, Object? params) async {
   if (method == 'Runtime.executionContextCreated') {
-    _handleExecutionContextCreated(source, params);
+    _maybeConnectToDwds(source, params);
   }
 
   _forwardChromeDebuggerEventToDwds(source, method, params);
@@ -141,62 +145,93 @@ void _forwardChromeDebuggerEventToDwds(
   }
 }
 
-void _handleExecutionContextCreated(Debuggee source, Object? params) {
-  if (params == null) return;
-  final context = json.decode(JSON.stringify(params))['context'];
-  final contextOrigin = context['origin'] as String;
-  if (contextOrigin == _origin) {
-    final contextId = context['id'] as int;
-    _connectToDwds(contextId);
-  }
+void _maybeConnectToDwds(Debuggee source, Object? params) async {
+  final tabId = source.tabId;
+  final debugInfo = await fetchStorageObject<DebugInfo>(
+    type: StorageObject.debugInfo,
+    tabId: tabId,
+  );
+  if (debugInfo == null) return;
+  final dartAppContextId =
+      _extractDartAppContextId(params, debugInfo.appOrigin);
+  if (dartAppContextId == null) return;
+  _connectToDwds(
+    dartAppContextId: dartAppContextId,
+    dartAppTabId: tabId,
+    debugInfo: debugInfo,
+  );
 }
 
-void _connectToDwds(int contextId) async {
-  final uri = Uri.parse(_extensionUri);
-  final authenticated = await _authenticateUser(uri, _tabId);
+void _connectToDwds({
+  required int dartAppContextId,
+  required int dartAppTabId,
+  required DebugInfo debugInfo,
+}) async {
+  if (debugInfo.extensionUrl == null) {
+    console.warn('Can\'t connect to DWDS without an extension URL.');
+    return;
+  }
+  // Authenticate the user before connecting:
+  final uri = Uri.parse(debugInfo.extensionUrl!);
+  final authenticated = await _authenticateUser(uri, dartAppTabId);
   if (!authenticated) return;
+  // Start the client connection with DWDS:
   final client = _createClient(uri);
-  _debugSessions.add(DebugSession(client, _tabId, _appId));
+  _debugSessions.add(DebugSession(client: client, appTabId: dartAppTabId));
 
   // Listen to events from DWDS:
   client.stream.listen(
-    (data) => _routeDwdsEvent(data, client),
+    (data) => _routeDwdsEvent(data, client, dartAppTabId),
     onDone: () {
       console.log('Closing debug connection with DWDS.');
-      _removeAndDetachDebugSessionForTab(_tabId);
+      // _removeAndDetachDebugSessionForTab(dartAppTabId);
     },
     onError: (_) {
       console.warn('Received error, closing debug connection with DWDS.');
-      _removeAndDetachDebugSessionForTab(_tabId);
+      // _removeAndDetachDebugSessionForTab(dartAppTabId);
     },
     cancelOnError: true,
   );
 
-  _sendDevToolsRequest(client, contextId);
+  _sendDevToolsRequest(client, dartAppContextId, dartAppTabId, debugInfo);
 }
 
-void _routeDwdsEvent(String eventData, SocketClient client) {
+int? _extractDartAppContextId(Object? params, String? dartAppOrigin) {
+  if (params == null || dartAppOrigin == null) return null;
+  final context = json.decode(JSON.stringify(params))['context'];
+  final contextOrigin = context['origin'] as String;
+  if (contextOrigin != dartAppOrigin) return null;
+  return context['id'] as int;
+}
+
+void _routeDwdsEvent(String eventData, SocketClient client, int tabId) {
   final message = serializers.deserialize(jsonDecode(eventData));
   if (message is ExtensionRequest) {
-    _forwardDwdsEventToChromeDebugger(message, client);
+    _forwardDwdsEventToChromeDebugger(message, client, tabId);
   } else if (message is ExtensionEvent) {
     switch (message.method) {
       case 'dwds.encodedUri':
         // TODO(elliette): Forward to external extensions.
         break;
       case 'dwds.devtoolsUri':
-        _injectDevToolsIframe(message.params);
+        _openDevTools(message.params);
         break;
     }
   }
 }
 
+void _openDevTools(String uri) async {
+  final devToolsOpener = await fetchStorageObject<DevToolsOpener>(
+      type: StorageObject.devToolsOpener);
+  await _createTab(uri, inNewWindow: devToolsOpener?.newWindow ?? false);
+}
+
 void _forwardDwdsEventToChromeDebugger(
-    ExtensionRequest message, SocketClient client) {
+    ExtensionRequest message, SocketClient client, int tabId) {
   final messageParams = message.commandParams ?? '{}';
   final params = BuiltMap<String, Object>(json.decode(messageParams)).toMap();
   chrome.debugger.sendCommand(
-      Debuggee(tabId: _tabId), message.command, js_util.jsify(params),
+      Debuggee(tabId: tabId), message.command, jsUtil.jsify(params),
       allowInterop(([e]) {
     // No arguments indicate that an error occurred.
     if (e == null) {
@@ -215,11 +250,11 @@ void _forwardDwdsEventToChromeDebugger(
   }));
 }
 
-void _sendDevToolsRequest(SocketClient client, int contextId) async {
-  final tabUrl = await _getTabUrl(_tabId);
+void _sendDevToolsRequest(SocketClient client, int contextId, int tabId, DebugInfo debugInfo) async {
+  final tabUrl = await _getTabUrl(tabId);
   client.sink.add(jsonEncode(serializers.serialize(DevToolsRequest((b) => b
-    ..appId = _appId
-    ..instanceId = _instanceId
+    ..appId = debugInfo.appId
+    ..instanceId = debugInfo.appInstanceId
     ..contextId = contextId
     ..tabUrl = tabUrl
     ..uriOnly = true))));
@@ -289,6 +324,11 @@ Future<Tab> _createTab(String url, {bool inNewWindow = false}) async {
     url: url,
   ));
   return promiseToFuture<Tab>(tabPromise);
+}
+
+Future<String> _getTabUrl(int tabId) async {
+  final tab = await promiseToFuture<Tab?>(chrome.tabs.get(tabId));
+  return tab?.url ?? '';
 }
 
 @JS()

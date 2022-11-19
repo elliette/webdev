@@ -19,15 +19,6 @@ class DebugSession {
   // The tab ID that contains the running Dart application.
   final int appTabId;
 
-  // The Dart app ID.
-  final String appId;
-
-  // The Dart app instance ID.
-  final String instanceId;
-
-  // The URI for the corresponding Dart DevTools.
-  final String? extensionUri;
-
   // Socket client for communication with dwds extension backend.
   late final SocketClient _socketClient;
 
@@ -42,9 +33,6 @@ class DebugSession {
   DebugSession({
     required client,
     required this.appTabId,
-    required this.appId,
-    required this.instanceId,
-    this.extensionUri,
   }) : _socketClient = client {
     // Collect extension events and send them periodically to the server.
     _batchSubscription = _batchController.stream.listen((events) {
