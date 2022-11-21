@@ -19,6 +19,7 @@ import 'package:js/js.dart';
 import 'package:js/js_util.dart' as jsUtil;
 import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:shelf/shelf.dart';
 
 import 'chrome_api.dart';
 import 'data_serializers.dart';
@@ -123,7 +124,9 @@ _enableExecutionContextReporting(int tabId) {
       Debuggee(tabId: tabId), 'Runtime.enable', EmptyParam(), allowInterop((_) {
     final chromeError = chrome.runtime.lastError;
     if (chromeError != null) {
-      window.alert(_translateChromeError(chromeError.message));
+      final errorMessage = _translateChromeError(chromeError.message);
+      chrome.notifications
+          .create(null, NotificationOptions(message: errorMessage), null);
       return;
     }
   }));
@@ -250,7 +253,8 @@ void _forwardDwdsEventToChromeDebugger(
   }));
 }
 
-void _sendDevToolsRequest(SocketClient client, int contextId, int tabId, DebugInfo debugInfo) async {
+void _sendDevToolsRequest(
+    SocketClient client, int contextId, int tabId, DebugInfo debugInfo) async {
   final tabUrl = await _getTabUrl(tabId);
   client.sink.add(jsonEncode(serializers.serialize(DevToolsRequest((b) => b
     ..appId = debugInfo.appId
@@ -265,19 +269,32 @@ Future<bool> _authenticateUser(Uri uri, int tabId) async {
   if (authUri.scheme == 'ws') authUri = authUri.replace(scheme: 'http');
   if (authUri.scheme == 'wss') authUri = authUri.replace(scheme: 'https');
   final authUrl = authUri.toString();
-  try {
-    final response = await HttpRequest.request(authUrl,
-        method: 'GET', withCredentials: true);
-    final responseText = response.responseText ?? '';
-    if (!responseText.contains('Dart Debug Authentication Success!')) {
+  try { 
+    final response = await self.fetchResource(
+      authUrl,
+      FetchOptions(
+        method: 'GET',
+        credentialsOptions: CredentialsOptions(credentials: 'include'),
+      ),
+    );
+    console.log('RESPONSE IS');
+    console.log('$response');
+    console.log('response is ok? ${response.ok}');
+    console.log('response status? ${response.status}');
+
+    // final responseText = response.responseText ?? '';
+    if (!response.ok) {
+      console.log('throwing not authenticated exception..');
       throw Exception('Not authenticated.');
     }
   } catch (_) {
-    if (window.confirm(
-        'Authentication required.\n\nClick OK to authenticate then try again.')) {
-      window.open(authUrl, 'Dart DevTools Authentication');
-      chrome.debugger.detach(Debuggee(tabId: tabId), allowInterop(() {}));
-    }
+    console.log('received err $_');
+    final authMessage =
+        'Authentication required. Please authenticate then try again.';
+    // chrome.notifications
+    //     .create(null, NotificationOptions(message: authMessage), null);
+    chrome.debugger.detach(Debuggee(tabId: tabId), allowInterop(() {}));
+    await _createTab(authUrl, inNewWindow: false);
     return false;
   }
   return true;

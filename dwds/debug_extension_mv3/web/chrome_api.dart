@@ -12,6 +12,7 @@ external Chrome get chrome;
 class Chrome {
   external Action get action;
   external Debugger get debugger;
+  external Notifications get notifications;
   external Runtime get runtime;
   external Scripting get scripting;
   external Storage get storage;
@@ -74,6 +75,22 @@ class Debuggee {
   external String get extensionId;
   external String get targetId;
   external factory Debuggee({int tabId, String? extensionId, String? targetId});
+}
+
+/// chrome.notification APIs:
+/// https://developer.chrome.com/docs/extensions/reference/notifications
+
+@JS()
+@anonymous
+class Notifications {
+  external void create(String? notificationId, NotificationOptions options, Function? callback);
+}
+
+@JS()
+@anonymous
+class NotificationOptions {
+  external String get message;
+  external factory NotificationOptions({String message});
 }
 
 /// chrome.runtime APIs:

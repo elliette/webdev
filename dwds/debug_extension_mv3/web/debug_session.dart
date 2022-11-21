@@ -12,7 +12,9 @@ import 'package:built_collection/built_collection.dart';
 import 'package:dwds/data/extension_request.dart';
 import 'package:dwds/data/serializers.dart';
 import 'package:dwds/src/sockets.dart';
-import 'package:dwds/src/utilities/batched_stream.dart';
+// TODO(https://github.com/dart-lang/sdk/issues/49973): Use conditional imports
+// in .../utilities/batched_stream so that we don't need to import a copy.
+import 'package:dwds/src/web_utilities/batched_stream.dart';
 import 'package:js/js.dart';
 
 class DebugSession {
