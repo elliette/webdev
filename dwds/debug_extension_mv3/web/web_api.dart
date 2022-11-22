@@ -14,13 +14,19 @@ external Console get console;
 external WorkerGlobalScope get self;
 
 extension E on WorkerGlobalScope {
-  Future<FetchResponse> fetchResource<T>(String resourceUrl, FetchOptions options) async {
-    final fetchFuture = js_util.promiseToFuture(js_util.callMethod(self, 'fetch', [
+  Future<dynamic> fetchResource(String resourceUrl, FetchOptions options) {
+    console.log('THIS IS $this');
+    console.log('THIS FETCH ${this.fetch}');
+    final fetchFuture = js_util.promiseToFuture(js_util.callMethod(this, 'fetch', [
         resourceUrl,
         options,
       ]));
-    final response = await fetchFuture;
-    return response as FetchResponse;
+    return fetchFuture;
+    // final response = await fetchFuture;
+    // console.log('casting response');
+    // final responseMap = Map<String, dynamic>.from(response);
+    // console.log('ok is ${responseMap['ok']}');
+    // return responseMap as FetchResponse;
   }
 }
 

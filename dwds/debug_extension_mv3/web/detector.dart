@@ -22,11 +22,13 @@ void _registerListeners() {
 }
 
 void _onDartAppReadyEvent(Event event) {
+  console.log('received dart app ready event');
   final debugInfo = getProperty(event, 'detail') as String?;
   if (debugInfo == null) {
     console.warn('Can\'t debug Dart app without debug info.');
     return;
   }
+  console.log('debug info is $debugInfo');
   _sendMessageToBackgroundScript(
     type: MessageType.debugInfo,
     body: debugInfo,

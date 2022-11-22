@@ -29,5 +29,16 @@
             "run_at": "document_end"
         }
     ],
+    "web_accessible_resources": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "resources": [
+                "iframe.html",
+                "iframe_injector.dart.js"
+            ]
+        }
+    ],
     "options_page": "settings.html"
 }

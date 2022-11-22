@@ -102,6 +102,8 @@ class Runtime {
   // Note: Not checking the lastError when one occurs throws a runtime exception.
   external ChromeError? get lastError;
 
+  external String getURL(String path);
+
   external void connect(String? extensionId, ConnectInfo info);
 
   external void sendMessage(
