@@ -16,13 +16,15 @@ import 'package:dwds/data/debug_info.dart';
 import 'package:dwds/data/devtools_request.dart';
 import 'package:dwds/data/extension_request.dart';
 import 'package:dwds/src/sockets.dart';
+// TODO(https://github.com/dart-lang/sdk/issues/49973): Use conditional imports
+// in .../utilities/batched_stream so that we don't need to import a copy.
+import 'package:dwds/src/web_utilities/batched_stream.dart';
 import 'package:js/js.dart';
 import 'package:js/js_util.dart' as js_util;
 import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'chrome_api.dart';
 import 'data_serializers.dart';
-import 'debug_session.dart';
 import 'storage.dart';
 import 'web_api.dart';
 
@@ -38,6 +40,56 @@ const _devToolsAlreadyOpenedAlert =
     'DevTools is already opened on a different window.';
 
 final _debugSessions = <DebugSession>[];
+class DebugSession {
+  // The tab ID that contains the running Dart application.
+  final int appTabId;
+
+  // Socket client for communication with dwds extension backend.
+  late final SocketClient _socketClient;
+
+  // How often to send batched events.
+  static const int _batchDelayMilliseconds = 1000;
+
+  // Collect events into batches to be send periodically to the server.
+  final _batchController =
+      BatchedStreamController<ExtensionEvent>(delay: _batchDelayMilliseconds);
+  late final StreamSubscription<List<ExtensionEvent>> _batchSubscription;
+
+  DebugSession({
+    required client,
+    required this.appTabId,
+  }) : _socketClient = client {
+    // Collect extension events and send them periodically to the server.
+    _batchSubscription = _batchController.stream.listen((events) {
+      _socketClient.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
+          (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
+    });
+  }
+
+  void set socketClient(SocketClient client) {
+    _socketClient = client;
+
+    // Collect extension events and send them periodically to the server.
+    _batchSubscription = _batchController.stream.listen((events) {
+      _socketClient.sink.add(jsonEncode(serializers.serialize(BatchedEvents(
+          (b) => b.events = ListBuilder<ExtensionEvent>(events)))));
+    });
+  }
+
+  void sendEvent(ExtensionEvent event) {
+    _socketClient.sink.add(jsonEncode(serializers.serialize(event)));
+  }
+
+  void sendBatchedEvent(ExtensionEvent event) {
+    _batchController.sink.add(event);
+  }
+
+  void close() {
+    _socketClient.close();
+    _batchSubscription.cancel();
+    _batchController.close();
+  }
+}
 
 void registerDebugEventListeners() {
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
@@ -62,7 +114,8 @@ _enableExecutionContextReporting(int tabId) {
     final chromeError = chrome.runtime.lastError;
     if (chromeError != null) {
       final errorMessage = _translateChromeError(chromeError.message);
-      console.warn(errorMessage);
+      chrome.notifications.create(/*notificationId*/ null,
+          NotificationOptions(message: errorMessage), /*callback*/ null);
       return;
     }
   }));
@@ -78,29 +131,32 @@ String _translateChromeError(String chromeErrorMessage) {
 
 Future<void> _onDebuggerEvent(
     Debuggee source, String method, Object? params) async {
-  if (method != 'Runtime.executionContextCreated') {
-    return _forwardChromeDebuggerEventToDwds(source, method, params);
+  if (method == 'Runtime.executionContextCreated') {
+    return _maybeConnectToDwds(source.tabId, params);
   }
+
+  return _forwardChromeDebuggerEventToDwds(source, method, params);
+}
+
+Future<void> _maybeConnectToDwds(int tabId, Object? params) async {
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String?;
-  // Ignore execution contexts for chrome extensions:
-  if (contextOrigin == null || contextOrigin.contains(('chrome-extension:')))
-    return;
+  if (contextOrigin == null) return;
+  if (contextOrigin.contains(('chrome-extension:'))) return;
   final debugInfo = await fetchStorageObject<DebugInfo>(
     type: StorageObject.debugInfo,
-    tabId: source.tabId,
+    tabId: tabId,
   );
-  if (contextOrigin != debugInfo?.appOrigin) return;
+  if (debugInfo == null) return;
+  if (contextOrigin != debugInfo.appOrigin) return;
   final contextId = context['id'] as int;
   final connected = await _connectToDwds(
     dartAppContextId: contextId,
-    dartAppTabId: source.tabId,
-    debugInfo: debugInfo!,
+    dartAppTabId: tabId,
+    debugInfo: debugInfo,
   );
-  if (connected) {
-    _debugLog('Connected to DWDS.');
-  } else {
-    _debugWarn('Failed to connect to DWDS.');
+  if (!connected) {
+    console.warn('Failed to connect to DWDS for $contextOrigin.');
   }
 }
 
@@ -123,10 +179,10 @@ Future<bool> _connectToDwds({
   final debugSession = DebugSession(client: client, appTabId: dartAppTabId);
   _debugSessions.add(debugSession);
   client.stream.listen((data) => _routeDwdsEvent(data, client, dartAppTabId), onDone: () {
-    _debugLog('Received stream done event');
+    _debugLog('DONE EVENT!');
   }, onError: (err) {
-    _debugWarn('Received stream error event: $err');
-  }, cancelOnError: true);
+    console.warn(err);
+  }, cancelOnError: false);
   _debugLog('Done creating event stream.');
   final tabUrl = await _getTabUrl(dartAppTabId);
   // Send a DevtoolsRequest to the event stream:

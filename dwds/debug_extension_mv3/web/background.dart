@@ -22,7 +22,7 @@ import 'web_api.dart';
 
 const _authenticationPath = '\$dwdsExtensionAuthentication';
 
-bool injectIframe = false;
+bool injectIframe =  false;
 
 void main() {
   _registerListeners();

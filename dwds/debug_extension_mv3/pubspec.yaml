@@ -12,8 +12,7 @@ dependencies:
   built_value: ^8.3.0
   collection: ^1.15.0
   js: ^0.6.1+1
-  sse:
-    path: /Users/elliottbrooks/dev/sse
+  sse: ^4.1.0
   web_socket_channel: ^2.0.0
 
 dev_dependencies:
@@ -27,3 +26,5 @@ dev_dependencies:
 dependency_overrides:
   dwds:
     path: ..
+  sse:
+    path: /Users/elliottbrooks/dev/sse
