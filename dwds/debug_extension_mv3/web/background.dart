@@ -22,7 +22,7 @@ import 'web_api.dart';
 
 const _authenticationPath = '\$dwdsExtensionAuthentication';
 
-bool injectIframe = true;
+bool injectIframe = false;
 
 void main() {
   _registerListeners();
@@ -115,7 +115,7 @@ Future<bool> _authenticateUser(Uri uri, int tabId) async {
   if (authUri.scheme == 'wss') authUri = authUri.replace(scheme: 'https');
   final authUrl = authUri.toString();
   try {
-    final response = await self.fetchResource(
+    final response = await fetch(
       authUrl,
       FetchOptions(
         method: 'GET',

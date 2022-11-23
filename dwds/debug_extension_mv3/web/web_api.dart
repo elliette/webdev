@@ -3,31 +3,17 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:js/js.dart';
-import 'dart:html' show WorkerGlobalScope;
+import 'package:js/js_util.dart';
 import 'dart:js_util' as js_util;
-import 'package:shelf/shelf.dart';
 
 @JS()
 external Console get console;
 
-@JS()
-external WorkerGlobalScope get self;
-
-extension E on WorkerGlobalScope {
-  Future<dynamic> fetchResource(String resourceUrl, FetchOptions options) {
-    console.log('THIS IS $this');
-    console.log('THIS FETCH ${this.fetch}');
-    final fetchFuture = js_util.promiseToFuture(js_util.callMethod(this, 'fetch', [
-        resourceUrl,
-        options,
-      ]));
-    return fetchFuture;
-    // final response = await fetchFuture;
-    // console.log('casting response');
-    // final responseMap = Map<String, dynamic>.from(response);
-    // console.log('ok is ${responseMap['ok']}');
-    // return responseMap as FetchResponse;
-  }
+Future<dynamic> fetch(String resourceUrl, FetchOptions options) {
+  return js_util.promiseToFuture(js_util.callMethod(globalThis, 'fetch', [
+      resourceUrl,
+      options,
+    ]));
 }
 
 @JS()

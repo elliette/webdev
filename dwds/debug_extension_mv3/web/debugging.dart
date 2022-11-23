@@ -115,6 +115,8 @@ Future<bool> _connectToDwds({
   }
   final uri = Uri.parse(debugInfo.extensionUrl!);
   // Start the client connection with DWDS:
+  final isWs = uri.isScheme('ws') || uri.isScheme('wss');
+  _debugLog('IS WEBSOCKET? $isWs');
   final client = uri.isScheme('ws') || uri.isScheme('wss')
       ? WebSocketClient(WebSocketChannel.connect(uri))
       : SseSocketClient(SseClient(uri.toString()));
