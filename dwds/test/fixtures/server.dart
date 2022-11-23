@@ -99,14 +99,15 @@ class TestServer {
       throw StateError('Unexpected Daemon build result: $result');
     });
 
+    print('STARTING DWDS WITH SSE? $useSse');
     final dwds = await Dwds.start(
         assetReader: assetReader,
         buildResults: filteredBuildResults,
         chromeConnection: chromeConnection,
         loadStrategy: strategy,
         spawnDds: spawnDds,
-        enableDebugExtension: enableDebugExtension,
-        enableDebugging: enableDebugging,
+        enableDebugExtension: true,
+        enableDebugging: true,
         useSseForDebugProxy: useSse,
         useSseForDebugBackend: useSse,
         useSseForInjectedClient: useSse,

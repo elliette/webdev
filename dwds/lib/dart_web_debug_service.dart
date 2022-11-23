@@ -111,6 +111,8 @@ class Dwds {
               port: extensionBackend.port,
               path: r'$debug')
           .toString());
+      print('START WITH $extensionBackend');
+      print('AND $extensionUri');
       if (urlEncoder != null) extensionUri = urlEncoder(await extensionUri);
     }
 
