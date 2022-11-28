@@ -9,7 +9,8 @@ import 'package:js/js.dart';
 
 import 'web_api.dart';
 
-bool _enableDebugLogging = const bool.fromEnvironment("is_dev");
+String _env = const String.fromEnvironment("env");
+bool _enableDebugLogging = _env == 'dev';
 
 enum _LogLevel {
   info,
@@ -30,6 +31,7 @@ debugError(String msg, {String? prefix}) {
 }
 
 void _log(String msg, {_LogLevel? level, String? prefix}) {
+  console.log('env is $_env');
   if (!_enableDebugLogging) return;
   final logMsg = prefix != null ? '[$prefix] $msg' : msg;
   final logLevel = level ?? _LogLevel.info;

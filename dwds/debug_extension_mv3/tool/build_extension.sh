@@ -13,23 +13,30 @@
 # ./tool/build_extension.sh prod
 
 prod="false"
-dev="true"
 
 case "$1" in
     prod)
         prod="true"
-        dev="false"
         shift;;
 esac
 
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-echo "Building dart2js-compiled extension to /compiled directory."
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-dart run build_runner build web --output build --release --define is_dev=$dev
+build_command="dart run build_runner build web --output build --release "
+define_arg="--define='build_web_compilers|entrypoint=dart2js_args="
 
-if [ $prod == false ]; then
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo "Updating dev files in /compiled directory."
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    dart tool/update_dev_files.dart
+if [ $prod == true ]; then
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "Building prod dart2js-compiled extension to /compiled directory."
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    $build_command+$define_arg+'["-Denv=prod", "--csp"]'
+
+    exit 1
 fi
+
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "Building dev dart2js-compiled extension to /compiled directory."
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+$build_command+$define_arg+'["-Denv=dev", "--csp"]'
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "Updating dev files in /compiled directory."
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+dart tool/update_dev_files.dart
