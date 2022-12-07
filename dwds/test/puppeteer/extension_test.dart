@@ -336,6 +336,27 @@ void main() async {
             chromeDevToolsTarget.type = 'page';
             print('CHROME DEVTOOLS IS NOW ${chromeDevToolsTarget.type}');
             final chromeDevToolsPage = await chromeDevToolsTarget.page;
+
+            await chromeDevToolsPage.keyboard.down(Key.meta);
+            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+            await chromeDevToolsPage.keyboard.up(Key.meta);
+
+            await chromeDevToolsPage.keyboard.down(Key.meta);
+            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+            await chromeDevToolsPage.keyboard.up(Key.meta);
+
+            await chromeDevToolsPage.keyboard.down(Key.meta);
+            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+            await chromeDevToolsPage.keyboard.up(Key.meta);
+
+            await chromeDevToolsPage.keyboard.down(Key.meta);
+            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+            await chromeDevToolsPage.keyboard.up(Key.meta);
+
+            await chromeDevToolsPage.keyboard.down(Key.meta);
+            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+            await chromeDevToolsPage.keyboard.up(Key.meta);
+
             final frames = chromeDevToolsPage.frames;
             for (final frame in frames) {
               final title = await frame.title;
@@ -343,7 +364,8 @@ void main() async {
               print(frame.url);
               print('---');
             }
-            final elements = await chromeDevToolsPage.$$('.tabbed-pane-header-tab-title');
+            final elements =
+                await chromeDevToolsPage.$$('.tabbed-pane-header-tab-title');
             print('Found ${elements.length} elements');
             await Future.delayed(Duration(seconds: 120));
             for (final element in elements) {
