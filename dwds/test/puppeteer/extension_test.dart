@@ -23,6 +23,8 @@ import 'test_utils.dart';
 
 final context = TestContext();
 
+enum Panel { debugger, inspector }
+
 void main() async {
   group('MV3 Debug Extension', () {
     late String extensionPath;
@@ -320,73 +322,64 @@ void main() async {
             await appTab.close();
           }, skip: true);
 
-          test('the Dart Debugger panel is added to Chrome DevTools', () async {
+          test('the correct extension panels are added to Chrome DevTools',
+              () async {
             final appUrl = context.appUrl;
-            // This is the blank page automatically opened by Chrome.
+            // This is the blank page automatically opened by Chrome:
             final blankTab = await navigateToPage(browser, url: 'about:blank');
             // Navigate to the Dart app:
             await blankTab.goto(appUrl, wait: Until.domContentLoaded);
-            await blankTab.bringToFront();
             final appTab = blankTab;
             await appTab.bringToFront();
-            final targets = browser.targets;
-            final chromeDevToolsTarget = targets.firstWhere(
+            final chromeDevToolsTarget = browser.targets.firstWhere(
                 (target) => target.url.startsWith('devtools://devtools'));
-            print('CHROME DEVTOOLS IS ${chromeDevToolsTarget.type}');
             chromeDevToolsTarget.type = 'page';
-            print('CHROME DEVTOOLS IS NOW ${chromeDevToolsTarget.type}');
             final chromeDevToolsPage = await chromeDevToolsTarget.page;
-
-            await chromeDevToolsPage.keyboard.down(Key.meta);
-            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
-            await chromeDevToolsPage.keyboard.up(Key.meta);
-
-            await chromeDevToolsPage.keyboard.down(Key.meta);
-            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
-            await chromeDevToolsPage.keyboard.up(Key.meta);
-
-            await chromeDevToolsPage.keyboard.down(Key.meta);
-            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
-            await chromeDevToolsPage.keyboard.up(Key.meta);
-
-            await chromeDevToolsPage.keyboard.down(Key.meta);
-            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
-            await chromeDevToolsPage.keyboard.up(Key.meta);
-
-            await chromeDevToolsPage.keyboard.down(Key.meta);
-            await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
-            await chromeDevToolsPage.keyboard.up(Key.meta);
-
-            final frames = chromeDevToolsPage.frames;
-            for (final frame in frames) {
-              final title = await frame.title;
-              print(title);
-              print(frame.url);
-              print('---');
+            if (isFlutterApp) {
+              await workerEvalDelay();
+              _tabLeft(chromeDevToolsPage);
+              final inspectorPanelElement =
+                  await _getPanelElement(browser, panel: Panel.inspector);
+              expect(inspectorPanelElement, isNotNull);
             }
-            final elements =
-                await chromeDevToolsPage.$$('.tabbed-pane-header-tab-title');
-            print('Found ${elements.length} elements');
-            await Future.delayed(Duration(seconds: 120));
-            for (final element in elements) {
-              print(element.toString());
-            }
-            // <span class="tabbed-pane-header-tab-title"docu title="">Security</span>
-            // #tab-resources > span
+            await workerEvalDelay();
+            _tabLeft(chromeDevToolsPage);
+            final debuggerPanelElement =
+                await _getPanelElement(browser, panel: Panel.debugger);
+            expect(debuggerPanelElement, isNotNull);
           });
-
-          if (isFlutterApp) {
-            test('the Flutter Inspector panel is added to Chrome DevTools',
-                () async {
-              // TODO(elliette): Requires either of the following to be resolved:
-              // - https://github.com/puppeteer/puppeteer/issues/9371
-              // - https://github.com/xvrh/puppeteer-dart/issues/201
-            }, skip: true);
-          }
         });
       }
     });
   });
+}
+
+Future<ElementHandle?> _getPanelElement(
+  Browser browser, {
+  required Panel panel,
+}) async {
+  final panelName =
+      panel == Panel.inspector ? 'inspector_panel' : 'debugger_panel';
+  final panelSelector =
+      panel == Panel.inspector ? '#inspector-panel' : '#debugger-panel';
+  final panelTarget =
+      await browser.waitForTarget((target) => target.url.contains(panelName));
+  panelTarget.type = 'page';
+  final panelPage = await panelTarget.page;
+  final frames = panelPage.frames;
+  final mainFrame = frames[0];
+  final panelElement = await mainFrame.$OrNull(panelSelector);
+  return panelElement;
+}
+
+void _tabLeft(Page chromeDevToolsPage) async {
+  // TODO(elliette): Detect which enviroment we are OS we are running
+  // in and update modifier key accordingly. Meta key for MacOs and
+  // Ctrl key for Linux/Windows.
+  final modifierKey = Key.meta;
+  await chromeDevToolsPage.keyboard.down(modifierKey);
+  await chromeDevToolsPage.keyboard.press(Key.bracketLeft);
+  await chromeDevToolsPage.keyboard.up(modifierKey);
 }
 
 Future<int> _getTabId(
