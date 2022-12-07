@@ -212,7 +212,7 @@ void main() async {
           // Verify that the Dart DevTools tab closes:
           await devToolsTabTarget.onClose;
         });
-      });
+      }, skip: true);
     }
 
     group('connected to an externally-built', () {
@@ -228,7 +228,9 @@ void main() async {
               serveDevTools: true,
               isInternalBuild: false,
               isFlutterApp: isFlutterApp,
+              openChromeDevTools: true,
             );
+
             worker = await getServiceWorker(browser);
           });
 
@@ -268,7 +270,7 @@ void main() async {
           }, skip: true);
         });
       }
-    });
+    }, skip: true);
 
     group('connected to an internally-built', () {
       for (var isFlutterApp in [true, false]) {
@@ -283,7 +285,9 @@ void main() async {
               serveDevTools: true,
               isInternalBuild: true,
               isFlutterApp: isFlutterApp,
+              openChromeDevTools: true,
             );
+
             worker = await getServiceWorker(browser);
           });
 
@@ -314,13 +318,40 @@ void main() async {
             expect(debugInfo.isInternalBuild, equals(true));
             expect(debugInfo.isFlutterApp, equals(isFlutterApp));
             await appTab.close();
-          });
+          }, skip: true);
 
           test('the Dart Debugger panel is added to Chrome DevTools', () async {
-            // TODO(elliette): Requires either of the following to be resolved:
-            // - https://github.com/puppeteer/puppeteer/issues/9371
-            // - https://github.com/xvrh/puppeteer-dart/issues/201
-          }, skip: true);
+            final appUrl = context.appUrl;
+            // This is the blank page automatically opened by Chrome.
+            final blankTab = await navigateToPage(browser, url: 'about:blank');
+            // Navigate to the Dart app:
+            await blankTab.goto(appUrl, wait: Until.domContentLoaded);
+            await blankTab.bringToFront();
+            final appTab = blankTab;
+            await appTab.bringToFront();
+            final targets = browser.targets;
+            final chromeDevToolsTarget = targets.firstWhere(
+                (target) => target.url.startsWith('devtools://devtools'));
+            print('CHROME DEVTOOLS IS ${chromeDevToolsTarget.type}');
+            chromeDevToolsTarget.type = 'page';
+            print('CHROME DEVTOOLS IS NOW ${chromeDevToolsTarget.type}');
+            final chromeDevToolsPage = await chromeDevToolsTarget.page;
+            final frames = chromeDevToolsPage.frames;
+            for (final frame in frames) {
+              final title = await frame.title;
+              print(title);
+              print(frame.url);
+              print('---');
+            }
+            final elements = await chromeDevToolsPage.$$('.tabbed-pane-header-tab-title');
+            print('Found ${elements.length} elements');
+            await Future.delayed(Duration(seconds: 120));
+            for (final element in elements) {
+              print(element.toString());
+            }
+            // <span class="tabbed-pane-header-tab-title"docu title="">Security</span>
+            // #tab-resources > span
+          });
 
           if (isFlutterApp) {
             test('the Flutter Inspector panel is added to Chrome DevTools',
