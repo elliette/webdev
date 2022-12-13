@@ -27,3 +27,10 @@ List<CompilationMode> supportedCompilationModes(NullSafety nullSafetyMode) {
           CompilationMode.frontendServer,
         ];
 }
+
+bool nullSafetyModeIsSupported(
+  CompilationMode compilationMode,
+  NullSafety nullSafetyMode,
+) {
+  return false;
+}

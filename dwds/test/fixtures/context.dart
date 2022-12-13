@@ -171,11 +171,11 @@ class TestContext {
   }) async {
     // TODO(https://github.com/dart-lang/webdev/issues/1591): Support compiling
     // with sound null-safety in Frontend Server.
-    if (compilationMode == CompilationMode.frontendServer &&
-        nullSafety == NullSafety.sound) {
-      throw Exception(
-          'Frontend Server compilation does not support sound null-safety. See https://github.com/dart-lang/webdev/issues/1591');
-    }
+    // if (compilationMode == CompilationMode.frontendServer &&
+    //     nullSafety == NullSafety.sound) {
+    //   throw Exception(
+    //       'Frontend Server compilation does not support sound null-safety. See https://github.com/dart-lang/webdev/issues/1591');
+    // }
 
     sdkConfigurationProvider ??= DefaultSdkConfigurationProvider();
 
@@ -229,16 +229,18 @@ class TestContext {
       String basePath = '';
 
       _port = await findUnusedPort();
+      final soundNullSafety = nullSafety == NullSafety.sound;
       switch (compilationMode) {
         case CompilationMode.buildDaemon:
           {
             final options = [
               if (enableExpressionEvaluation) ...[
                 '--define',
-                'build_web_compilers|ddc=generate-full-dill=true',
+                'build_web_compilers:entrypoint=sound_null_safety=$soundNullSafety|ddc=generate-full-dill=true',
               ],
               '--verbose',
             ];
+            print('OPTIONS ARE: $options');
             _daemonClient =
                 await connectClient(workingDirectory, options, (log) {
               final record = log.toLogRecord();
