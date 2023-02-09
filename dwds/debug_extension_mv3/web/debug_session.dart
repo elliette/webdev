@@ -124,17 +124,15 @@ void attachDebugger(int dartAppTabId, {required Trigger trigger}) async {
 }
 
 Future<void> clearStaleDebugSession(int tabId) async {
-  debugLog('clear stale debug session:');
+  debugLog('Clearing stale debug session data...');
   final debugSession = _debugSessionForTab(tabId, type: TabType.dartApp);
   if (debugSession != null) {
-    debugLog('detach debugger...');
     await detachDebugger(
       tabId,
       type: TabType.dartApp,
       reason: DetachReason.staleDebugSession,
     );
   } else {
-    debugLog('remove storage objects...');
     await _removeStaleStorageObjects(tabId);
   }
 }
@@ -145,7 +143,6 @@ Future<void> detachDebugger(
   required DetachReason reason,
 }) async {
   final debugSession = _debugSessionForTab(tabId, type: type);
-  debugLog('detach debugger, debugt session is $debugSession');
   if (debugSession == null) return;
   final debuggee = Debuggee(tabId: debugSession.appTabId);
   final detachPromise = chrome.debugger.detach(debuggee);
@@ -179,7 +176,6 @@ _enableExecutionContextReporting(int tabId) {
   // Runtime.enable enables reporting of execution contexts creation by means of
   // executionContextCreated event. When the reporting gets enabled the event
   // will be sent immediately for each existing execution context:
-  debugLog('in enable execution context reporting');
   chrome.debugger.sendCommand(
       Debuggee(tabId: tabId), 'Runtime.enable', EmptyParam(), allowInterop((_) {
     final chromeError = chrome.runtime.lastError;
@@ -208,7 +204,6 @@ Future<void> _onDebuggerEvent(
 
   if (method == 'Runtime.executionContextCreated') {
     // Only try to connect to DWDS if we don't already have a debugger instance:
-    debugLog('execution conext created');
     if (_debuggerLocation(tabId) == null) {
       return _maybeConnectToDwds(source.tabId, params);
     }
@@ -218,7 +213,6 @@ Future<void> _onDebuggerEvent(
 }
 
 Future<void> _maybeConnectToDwds(int tabId, Object? params) async {
-  debugLog('connecting to dwds');
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String?;
   if (contextOrigin == null) return;

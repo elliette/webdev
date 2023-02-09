@@ -95,7 +95,6 @@ void _handleRuntimeMessages(
         }
         // If this is a new Dart app, we need to clear old debug session data:
         if (!await _matchesAppInStorage(debugInfo.appId, tabId: dartTab.id)) {
-          debugLog('app does not match app in storage');
           await clearStaleDebugSession(dartTab.id);
         }
         // Save the debug info for the Dart app in storage:
@@ -163,8 +162,6 @@ Future<DebugInfo?> _fetchDebugInfo(int tabId) {
 
 Future<bool> _matchesAppInStorage(String? appId, {required int tabId}) async {
   final debugInfo = await _fetchDebugInfo(tabId);
-  debugLog('app in storage is ${debugInfo?.appId}');
-  debugLog('vs new app is $appId');
   return appId != null && appId == debugInfo?.appId;
 }
 
