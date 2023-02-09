@@ -22,7 +22,7 @@ import 'utils.dart';
 
 bool connecting = false;
 String backgroundColor = darkColor;
-bool isDartApp = true;
+// bool isDartApp = true;
 
 const bugLinkId = 'bugLink';
 const darkColor = '202125';
@@ -100,12 +100,12 @@ void _handleStorageChanges(Object storageObj, String storageArea) {
   // We only care about session storage objects:
   if (storageArea != 'session') return;
 
-  interceptStorageChange<DebugInfo>(
-    storageObj: storageObj,
-    expectedType: StorageObject.debugInfo,
-    tabId: _tabId,
-    changeHandler: _handleDebugInfoChanges,
-  );
+  // interceptStorageChange<DebugInfo>(
+  //   storageObj: storageObj,
+  //   expectedType: StorageObject.debugInfo,
+  //   tabId: _tabId,
+  //   changeHandler: _handleDebugInfoChanges,
+  // );
   interceptStorageChange<String>(
     storageObj: storageObj,
     expectedType: StorageObject.devToolsUri,
@@ -114,16 +114,16 @@ void _handleStorageChanges(Object storageObj, String storageArea) {
   );
 }
 
-void _handleDebugInfoChanges(DebugInfo? debugInfo) async {
-  if (debugInfo == null && isDartApp) {
-    isDartApp = false;
-    _showWarningBanner('Dart app is no longer open.');
-  }
-  if (debugInfo != null && !isDartApp) {
-    isDartApp = true;
-    _hideWarningBanner();
-  }
-}
+// void _handleDebugInfoChanges(DebugInfo? debugInfo) async {
+//   if (debugInfo == null && isDartApp) {
+//     isDartApp = false;
+//     _showWarningBanner('Dart app is no longer open.');
+//   }
+//   if (debugInfo != null && !isDartApp) {
+//     isDartApp = true;
+//     _hideWarningBanner();
+//   }
+// }
 
 void _handleDevToolsUriChanges(String? devToolsUri) async {
   if (devToolsUri != null) {
@@ -235,7 +235,12 @@ void _maybeHandleConnectionTimeout() async {
 void _maybeInjectDevToolsIframe() async {
   final devToolsUri = await fetchStorageObject<String>(
       type: StorageObject.devToolsUri, tabId: _tabId);
-  if (devToolsUri != null) {
+  if (devToolsUri == null) return;
+  if (isActiveDebugSession(_tabId)) {
+    debugWarn('Unexpected state. Stale DevTools URI.');
+    await clearStaleDebugSession(_tabId);
+    _updateElementVisibility(landingPageId, visible: true);
+  } else {
     _injectDevToolsIframe(devToolsUri);
   }
 }

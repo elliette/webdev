@@ -123,20 +123,6 @@ void attachDebugger(int dartAppTabId, {required Trigger trigger}) async {
   );
 }
 
-Future<void> clearStaleDebugSession(int tabId) async {
-  debugLog('Clearing stale debug session data...');
-  final debugSession = _debugSessionForTab(tabId, type: TabType.dartApp);
-  if (debugSession != null) {
-    await detachDebugger(
-      tabId,
-      type: TabType.dartApp,
-      reason: DetachReason.staleDebugSession,
-    );
-  } else {
-    await _removeStaleStorageObjects(tabId);
-  }
-}
-
 Future<void> detachDebugger(
   int tabId, {
   required TabType type,
@@ -155,21 +141,39 @@ Future<void> detachDebugger(
   await _handleDebuggerDetach(debuggee, reason);
 }
 
+bool isActiveDebugSession(int tabId) =>
+    _debugSessionForTab(tabId, type: TabType.dartApp) != null;
+
+Future<void> clearStaleDebugSession(int tabId) async {
+  debugLog('Clearing stale debug session data...');
+  final debugSession = _debugSessionForTab(tabId, type: TabType.dartApp);
+  if (debugSession != null) {
+    await detachDebugger(
+      tabId,
+      type: TabType.dartApp,
+      reason: DetachReason.staleDebugSession,
+    );
+  } else {
+    await _removeStaleStorageObjects(tabId);
+  }
+}
+
 void _registerDebugEventListeners() {
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
-  chrome.debugger.onDetach.addListener(allowInterop(
-    (source, _) => _handleDebuggerDetach(
+  chrome.debugger.onDetach.addListener(allowInterop((source, _) async {
+    debugLog('DETACHED BY USER');
+    await _handleDebuggerDetach(
       source,
       DetachReason.canceledByUser,
-    ),
-  ));
-  chrome.tabs.onRemoved.addListener(allowInterop(
-    (tabId, _) => detachDebugger(
+    );
+  }));
+  chrome.tabs.onRemoved.addListener(allowInterop((tabId, _) async {
+    await detachDebugger(
       tabId,
       type: TabType.devTools,
       reason: DetachReason.devToolsTabClosed,
-    ),
-  ));
+    );
+  }));
 }
 
 _enableExecutionContextReporting(int tabId) {
