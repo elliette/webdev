@@ -26,3 +26,5 @@ dev_dependencies:
 dependency_overrides:
   dwds:
     path: ..
+  sse:
+    path: /Users/elliottbrooks/dev/sse

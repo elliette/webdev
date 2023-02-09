@@ -93,6 +93,11 @@ void _handleRuntimeMessages(
           debugWarn('Received debug info but tab is missing.');
           return;
         }
+        // If this is a new Dart app, we need to clear old debug session data:
+        if (!await _matchesAppInStorage(debugInfo.appId, tabId: dartTab.id)) {
+          debugLog('app does not match app in storage');
+          await clearStaleDebugSession(dartTab.id);
+        }
         // Save the debug info for the Dart app in storage:
         await setStorageObject<DebugInfo>(
             type: StorageObject.debugInfo, value: debugInfo, tabId: dartTab.id);
@@ -122,13 +127,9 @@ void _detectNavigationAwayFromDartApp(NavigationInfo navigationInfo) async {
   final debugInfo = await _fetchDebugInfo(navigationInfo.tabId);
   if (debugInfo == null) return;
   if (debugInfo.appUrl != navigationInfo.url) {
+    debugLog('detected navigation away from app');
     _setDefaultIcon();
-    await removeStorageObject(type: StorageObject.debugInfo, tabId: tabId);
-    detachDebugger(
-      tabId,
-      type: TabType.dartApp,
-      reason: DetachReason.navigatedAwayFromApp,
-    );
+    await clearStaleDebugSession(tabId);
   }
 }
 
@@ -158,6 +159,13 @@ Future<DebugInfo?> _fetchDebugInfo(int tabId) {
     type: StorageObject.debugInfo,
     tabId: tabId,
   );
+}
+
+Future<bool> _matchesAppInStorage(String? appId, {required int tabId}) async {
+  final debugInfo = await _fetchDebugInfo(tabId);
+  debugLog('app in storage is ${debugInfo?.appId}');
+  debugLog('vs new app is $appId');
+  return appId != null && appId == debugInfo?.appId;
 }
 
 Future<Tab?> _getTab() async {

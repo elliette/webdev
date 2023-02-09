@@ -49,6 +49,7 @@ enum DetachReason {
   connectionDoneEvent,
   devToolsTabClosed,
   navigatedAwayFromApp,
+  staleDebugSession,
   unknown;
 
   factory DetachReason.fromString(String value) {
@@ -122,12 +123,29 @@ void attachDebugger(int dartAppTabId, {required Trigger trigger}) async {
   );
 }
 
-void detachDebugger(
+Future<void> clearStaleDebugSession(int tabId) async {
+  debugLog('clear stale debug session:');
+  final debugSession = _debugSessionForTab(tabId, type: TabType.dartApp);
+  if (debugSession != null) {
+    debugLog('detach debugger...');
+    await detachDebugger(
+      tabId,
+      type: TabType.dartApp,
+      reason: DetachReason.staleDebugSession,
+    );
+  } else {
+    debugLog('remove storage objects...');
+    await _removeStaleStorageObjects(tabId);
+  }
+}
+
+Future<void> detachDebugger(
   int tabId, {
   required TabType type,
   required DetachReason reason,
 }) async {
   final debugSession = _debugSessionForTab(tabId, type: type);
+  debugLog('detach debugger, debugt session is $debugSession');
   if (debugSession == null) return;
   final debuggee = Debuggee(tabId: debugSession.appTabId);
   final detachPromise = chrome.debugger.detach(debuggee);
@@ -136,9 +154,8 @@ void detachDebugger(
   if (error != null) {
     debugWarn(
         'Error detaching tab for reason: $reason. Error: ${error.message}');
-  } else {
-    _handleDebuggerDetach(debuggee, reason);
   }
+  await _handleDebuggerDetach(debuggee, reason);
 }
 
 void _registerDebugEventListeners() {
@@ -162,6 +179,7 @@ _enableExecutionContextReporting(int tabId) {
   // Runtime.enable enables reporting of execution contexts creation by means of
   // executionContextCreated event. When the reporting gets enabled the event
   // will be sent immediately for each existing execution context:
+  debugLog('in enable execution context reporting');
   chrome.debugger.sendCommand(
       Debuggee(tabId: tabId), 'Runtime.enable', EmptyParam(), allowInterop((_) {
     final chromeError = chrome.runtime.lastError;
@@ -190,6 +208,7 @@ Future<void> _onDebuggerEvent(
 
   if (method == 'Runtime.executionContextCreated') {
     // Only try to connect to DWDS if we don't already have a debugger instance:
+    debugLog('execution conext created');
     if (_debuggerLocation(tabId) == null) {
       return _maybeConnectToDwds(source.tabId, params);
     }
@@ -199,6 +218,7 @@ Future<void> _onDebuggerEvent(
 }
 
 Future<void> _maybeConnectToDwds(int tabId, Object? params) async {
+  debugLog('connecting to dwds');
   final context = json.decode(JSON.stringify(params))['context'];
   final contextOrigin = context['origin'] as String?;
   if (contextOrigin == null) return;
@@ -242,16 +262,16 @@ Future<bool> _connectToDwds({
     appTabId: dartAppTabId,
     trigger: trigger,
     onIncoming: (data) => _routeDwdsEvent(data, client, dartAppTabId),
-    onDone: () {
-      detachDebugger(
+    onDone: () async {
+      await detachDebugger(
         dartAppTabId,
         type: TabType.dartApp,
         reason: DetachReason.connectionDoneEvent,
       );
     },
-    onError: (err) {
+    onError: (err) async {
       debugWarn('Connection error: $err', verbose: true);
-      detachDebugger(
+      await detachDebugger(
         dartAppTabId,
         type: TabType.dartApp,
         reason: DetachReason.connectionErrorEvent,
@@ -371,7 +391,7 @@ void _openDevTools(String devToolsUri, {required int dartAppTabId}) async {
   }
 }
 
-void _handleDebuggerDetach(Debuggee source, DetachReason reason) async {
+Future<void> _handleDebuggerDetach(Debuggee source, DetachReason reason) async {
   final tabId = source.tabId;
   debugLog(
     'Debugger detached due to: $reason',
@@ -379,22 +399,28 @@ void _handleDebuggerDetach(Debuggee source, DetachReason reason) async {
     prefix: '$tabId',
   );
   final debugSession = _debugSessionForTab(tabId, type: TabType.dartApp);
-  if (debugSession == null) return;
-  debugLog('Removing debug session...');
-  _removeDebugSession(debugSession);
-  // Notify the extension panels that the debug session has ended:
-  _sendStopDebuggingMessage(reason, dartAppTabId: source.tabId);
-  // Remove the DevTools URI and encoded URI from storage:
+  if (debugSession != null) {
+    debugLog('Removing debug session...');
+    _removeDebugSession(debugSession);
+    // Notify the extension panels that the debug session has ended:
+    _sendStopDebuggingMessage(reason, dartAppTabId: tabId);
+    // Maybe close the associated DevTools tab as well:
+    final devToolsTabId = debugSession.devToolsTabId;
+    if (devToolsTabId == null) return;
+    final devToolsTab = await getTab(devToolsTabId);
+    if (devToolsTab != null) {
+      debugLog('Closing DevTools tab...');
+      chrome.tabs.remove(devToolsTabId);
+    }
+  }
+  await _removeStaleStorageObjects(tabId);
+}
+
+Future<void> _removeStaleStorageObjects(int tabId) async {
+  // Remove the DevTools URI, encoded URI and debug info from storage:
   await removeStorageObject(type: StorageObject.devToolsUri, tabId: tabId);
   await removeStorageObject(type: StorageObject.encodedUri, tabId: tabId);
-  // Maybe close the associated DevTools tab as well:
-  final devToolsTabId = debugSession.devToolsTabId;
-  if (devToolsTabId == null) return;
-  final devToolsTab = await getTab(devToolsTabId);
-  if (devToolsTab != null) {
-    debugLog('Closing DevTools tab...');
-    chrome.tabs.remove(devToolsTabId);
-  }
+  await removeStorageObject(type: StorageObject.debugInfo, tabId: tabId);
 }
 
 void _removeDebugSession(_DebugSession debugSession) {
