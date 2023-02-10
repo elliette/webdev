@@ -135,7 +135,9 @@ StorageArea _getStorageArea(Persistance persistance) {
     case Persistance.acrossSessions:
       return chrome.storage.local;
     case Persistance.sessionOnly:
-      return chrome.storage.session;
+      // TODO(elliette): Session storage only exists for MV3. Switch to from
+      // chrome.storage.local to chrome.storage.session for MV3.
+      return chrome.storage.local;
   }
 }
 

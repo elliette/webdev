@@ -6,12 +6,27 @@ import 'dart:html';
 
 import 'package:js/js.dart';
 
+// TODO(elliette): Switch to MV3 implementation.
 @JS()
-external Chrome get chrome;
+external ChromeMV2 get chrome;
 
 @JS()
 @anonymous
-class Chrome {
+class ChromeMV2 {
+  external Action get browserAction;
+  external Debugger get debugger;
+  external Devtools get devtools;
+  external Notifications get notifications;
+  external Runtime get runtime;
+  external Storage get storage;
+  external TabsMV2 get tabs;
+  external WebNavigation get webNavigation;
+  external WindowsMV2 get windows;
+}
+
+@JS()
+@anonymous
+class ChromeMV3 {
   external Action get action;
   external Debugger get debugger;
   external Devtools get devtools;
@@ -19,9 +34,9 @@ class Chrome {
   external Runtime get runtime;
   external Scripting get scripting;
   external Storage get storage;
-  external Tabs get tabs;
+  external TabsMV3 get tabs;
   external WebNavigation get webNavigation;
-  external Windows get windows;
+  external WindowMV3 get windows;
 }
 
 /// chrome.action APIs
@@ -291,7 +306,26 @@ class OnChangedHandler {
 
 @JS()
 @anonymous
-class Tabs {
+class TabsMV2 {
+  external void query(QueryInfo queryInfo, void Function(List<Tab>) callback);
+
+  external void create(TabInfo tabInfo, void Function(Tab) callback);
+
+  external void get(int tabId, void Function(Tab?) callback);
+
+  external void remove(int tabId, void Function()? callback);
+
+  external void executeScript(
+      int? tabId, TabInjectDetails details, Function(dynamic result)? callback);
+
+  external OnActivatedHandler get onActivated;
+
+  external OnRemovedHandler get onRemoved;
+}
+
+@JS()
+@anonymous
+class TabsMV3 {
   external Object query(QueryInfo queryInfo);
 
   external Object create(TabInfo tabInfo);
@@ -315,6 +349,21 @@ class OnActivatedHandler {
 @anonymous
 class OnRemovedHandler {
   external void addListener(void Function(int tabId, dynamic info) callback);
+}
+
+@JS()
+@anonymous
+class TabInjectDetails<T, U> {
+  external bool? get allFrames;
+  external String? get code;
+  external String? get file;
+  external int? get frameId;
+  external factory TabInjectDetails({
+    bool? allFrames,
+    String? code,
+    String? file,
+    int? frameId,
+  });
 }
 
 @JS()
@@ -377,7 +426,15 @@ class NavigationInfo {
 
 @JS()
 @anonymous
-class Windows {
+class WindowsMV2 {
+  external void create(WindowInfo? createData, Function(WindowObj) callback);
+
+  external OnFocusChangedHandler get onFocusChanged;
+}
+
+@JS()
+@anonymous
+class WindowMV3 {
   external Object create(WindowInfo? createData);
 
   external OnFocusChangedHandler get onFocusChanged;

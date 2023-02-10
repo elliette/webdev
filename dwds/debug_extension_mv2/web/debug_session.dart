@@ -393,7 +393,7 @@ void _handleDebuggerDetach(Debuggee source, DetachReason reason) async {
   final devToolsTab = await getTab(devToolsTabId);
   if (devToolsTab != null) {
     debugLog('Closing DevTools tab...');
-    chrome.tabs.remove(devToolsTabId);
+    removeTab(devToolsTabId);
   }
 }
 
