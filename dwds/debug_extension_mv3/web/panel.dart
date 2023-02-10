@@ -216,7 +216,8 @@ void _launchDebugConnection(Event _) async {
   final json = jsonEncode(serializers.serialize(DebugStateChange((b) => b
     ..tabId = _tabId
     ..newState = DebugStateChange.startDebugging)));
-  sendRuntimeMessage(
+  debugLog('SEND START DEBUGGING TO BACKGROUND');
+  await sendRuntimeMessage(
       type: MessageType.debugStateChange,
       body: json,
       sender: Script.debuggerPanel,

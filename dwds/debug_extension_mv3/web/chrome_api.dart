@@ -165,7 +165,7 @@ class NotificationOptions {
 class Runtime {
   external void connect(String? extensionId, ConnectInfo info);
 
-  external void sendMessage(
+  external Object sendMessage(
       String? id, Object? message, Object? options, Function? callback);
 
   external Object getManifest();

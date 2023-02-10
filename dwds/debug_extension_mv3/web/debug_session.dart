@@ -114,6 +114,7 @@ void attachDebugger(int dartAppTabId, {required Trigger trigger}) async {
 
   _tabIdToTrigger[dartAppTabId] = trigger;
   _registerDebugEventListeners();
+  debugLog('attaching,,....');
   chrome.debugger.attach(
     Debuggee(tabId: dartAppTabId),
     '1.3',
@@ -154,14 +155,13 @@ Future<void> clearStaleDebugSession(int tabId) async {
       reason: DetachReason.staleDebugSession,
     );
   } else {
-    await _removeStaleStorageObjects(tabId);
+    await _removeDebugSessionDataInStorage(tabId);
   }
 }
 
 void _registerDebugEventListeners() {
   chrome.debugger.onEvent.addListener(allowInterop(_onDebuggerEvent));
   chrome.debugger.onDetach.addListener(allowInterop((source, _) async {
-    debugLog('DETACHED BY USER');
     await _handleDebuggerDetach(
       source,
       DetachReason.canceledByUser,
@@ -235,7 +235,7 @@ Future<void> _maybeConnectToDwds(int tabId, Object? params) async {
   );
   if (!connected) {
     debugWarn('Failed to connect to DWDS for $contextOrigin.');
-    _sendConnectFailureMessage(ConnectFailureReason.unknown,
+    await _sendConnectFailureMessage(ConnectFailureReason.unknown,
         dartAppTabId: tabId);
   }
 }
@@ -401,24 +401,26 @@ Future<void> _handleDebuggerDetach(Debuggee source, DetachReason reason) async {
     debugLog('Removing debug session...');
     _removeDebugSession(debugSession);
     // Notify the extension panels that the debug session has ended:
-    _sendStopDebuggingMessage(reason, dartAppTabId: tabId);
+    await _sendStopDebuggingMessage(reason, dartAppTabId: tabId);
     // Maybe close the associated DevTools tab as well:
-    final devToolsTabId = debugSession.devToolsTabId;
-    if (devToolsTabId == null) return;
-    final devToolsTab = await getTab(devToolsTabId);
-    if (devToolsTab != null) {
-      debugLog('Closing DevTools tab...');
-      chrome.tabs.remove(devToolsTabId);
-    }
+    await _maybeCloseDevTools(debugSession.devToolsTabId);
   }
-  await _removeStaleStorageObjects(tabId);
+  await _removeDebugSessionDataInStorage(tabId);
 }
 
-Future<void> _removeStaleStorageObjects(int tabId) async {
+Future<void> _maybeCloseDevTools(int? devToolsTabId) async {
+  if (devToolsTabId == null) return;
+  final devToolsTab = await getTab(devToolsTabId);
+  if (devToolsTab != null) {
+    debugLog('Closing DevTools tab...');
+    chrome.tabs.remove(devToolsTabId);
+  }
+}
+
+Future<void> _removeDebugSessionDataInStorage(int tabId) async {
   // Remove the DevTools URI, encoded URI and debug info from storage:
   await removeStorageObject(type: StorageObject.devToolsUri, tabId: tabId);
   await removeStorageObject(type: StorageObject.encodedUri, tabId: tabId);
-  await removeStorageObject(type: StorageObject.debugInfo, tabId: tabId);
 }
 
 void _removeDebugSession(_DebugSession debugSession) {
@@ -427,9 +429,8 @@ void _removeDebugSession(_DebugSession debugSession) {
   // DWDS that we should close the connection, instead of relying on the done
   // event sent when the client is closed. See details:
   // https://github.com/dart-lang/webdev/pull/1595#issuecomment-1116773378
-  final event =
-      _extensionEventFor('DebugExtension.detached', js_util.jsify({}));
-  debugSession.sendEvent(event);
+  debugSession.sendEvent(
+      _extensionEventFor('DebugExtension.detached', js_util.jsify({})));
   debugSession.close();
   final removed = _debugSessions.remove(debugSession);
   if (!removed) {
@@ -437,25 +438,25 @@ void _removeDebugSession(_DebugSession debugSession) {
   }
 }
 
-void _sendConnectFailureMessage(ConnectFailureReason reason,
+Future<bool> _sendConnectFailureMessage(ConnectFailureReason reason,
     {required int dartAppTabId}) async {
   final json = jsonEncode(serializers.serialize(ConnectFailure((b) => b
     ..tabId = dartAppTabId
     ..reason = reason.name)));
-  sendRuntimeMessage(
+  return await sendRuntimeMessage(
       type: MessageType.connectFailure,
       body: json,
       sender: Script.background,
       recipient: Script.debuggerPanel);
 }
 
-void _sendStopDebuggingMessage(DetachReason reason,
+Future<bool> _sendStopDebuggingMessage(DetachReason reason,
     {required int dartAppTabId}) async {
   final json = jsonEncode(serializers.serialize(DebugStateChange((b) => b
     ..tabId = dartAppTabId
     ..reason = reason.name
     ..newState = DebugStateChange.stopDebugging)));
-  sendRuntimeMessage(
+  return await sendRuntimeMessage(
       type: MessageType.debugStateChange,
       body: json,
       sender: Script.background,
@@ -493,7 +494,7 @@ Future<bool> _authenticateUser(int tabId) async {
       tabId: tabId,
     );
   } else {
-    _sendConnectFailureMessage(
+    await _sendConnectFailureMessage(
       ConnectFailureReason.authentication,
       dartAppTabId: tabId,
     );
@@ -637,8 +638,20 @@ class _DebugSession {
   }
 
   void close() {
-    _socketClient.close();
-    _batchSubscription.cancel();
-    _batchController.close();
+    try {
+      _socketClient.close();
+    } catch (error) {
+      debugError('Error closing socket client: $error');
+    }
+    try {
+      _batchSubscription.cancel();
+    } catch (error) {
+      debugError('Error canceling batch subscription: $error');
+    }
+    try {
+      _batchController.close();
+    } catch (error) {
+      debugError('Error closing batch controller: $error');
+    }
   }
 }

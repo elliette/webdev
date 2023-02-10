@@ -5,6 +5,7 @@
 @JS()
 library messaging;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:js/js.dart';
@@ -100,11 +101,12 @@ void interceptMessage<T>({
   }
 }
 
-void sendRuntimeMessage(
+Future<bool> sendRuntimeMessage(
     {required MessageType type,
     required String body,
     required Script sender,
     required Script recipient}) {
+  final completer = Completer<bool>();
   final message = Message(
     to: recipient,
     from: sender,
@@ -115,6 +117,16 @@ void sendRuntimeMessage(
     /*id*/ null,
     message.toJSON(),
     /*options*/ null,
-    /*callback*/ null,
+    /*callback*/ allowInterop(
+      () {
+        final error = chrome.runtime.lastError;
+        if (error != null) {
+          debugError(
+              'Error sending $type to $recipient from $sender: ${error.message}');
+        }
+        completer.complete(error != null);
+      },
+    ),
   );
+  return completer.future;
 }

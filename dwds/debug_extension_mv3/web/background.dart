@@ -63,6 +63,8 @@ void _handleRuntimeMessages(
     dynamic jsRequest, MessageSender sender, Function sendResponse) async {
   if (jsRequest is! String) return;
 
+  debugLog('RECEIVED RUNTIME MSG $jsRequest');
+
   interceptMessage<String>(
       message: jsRequest,
       expectedType: MessageType.isAuthenticated,
@@ -129,6 +131,7 @@ void _detectNavigationAwayFromDartApp(NavigationInfo navigationInfo) async {
     debugLog('detected navigation away from app');
     _setDefaultIcon();
     await clearStaleDebugSession(tabId);
+    await removeStorageObject(type: StorageObject.debugInfo, tabId: tabId);
   }
 }
 
