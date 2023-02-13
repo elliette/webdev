@@ -96,7 +96,21 @@ bool isDevMode() {
   }
   final extensionManifest = chrome.runtime.getManifest();
   final extensionName = getProperty(extensionManifest, 'name') ?? '';
-  return extensionName.contains('DEV');
+  _isDevMode = extensionName.contains('DEV');
+  return _isDevMode!;
+}
+
+bool? _isMV3;
+
+bool isMV3() {
+  if (_isMV3 != null) {
+    return _isMV3!;
+  }
+  final extensionManifest = chrome.runtime.getManifest();
+  final manifestVersion =
+      getProperty(extensionManifest, 'manifest_version') ?? 2;
+  _isMV3 = manifestVersion == 3;
+  return _isMV3!;
 }
 
 String addQueryParameters(
