@@ -18,7 +18,7 @@
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "scripts": "background.dart.js"
+    "scripts": ["background.dart.js"]
   },
   "content_scripts": [
     {

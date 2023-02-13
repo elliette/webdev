@@ -20,6 +20,8 @@ Port? _lifelinePort;
 int? _lifelineTab;
 
 Future<void> maybeCreateLifelinePort(int tabId) async {
+  // This is only necessary for Manifest V3 extensions:
+  if (!isMV3) return;
   // Don't create a lifeline port if we already have one (meaning another Dart
   // app is currently being debugged):
   if (_lifelinePort != null) {
@@ -33,9 +35,12 @@ Future<void> maybeCreateLifelinePort(int tabId) async {
   debugLog('Creating lifeline port.');
   _lifelineTab = tabId;
   await injectScript('lifeline_connection.dart.js', tabId: tabId);
+  debugLog('done creating lifeline port');
 }
 
 void maybeRemoveLifelinePort(int removedTabId) {
+  // This is only necessary for Manifest V3 extensions:
+  if (!isMV3) return;
   // If the removed Dart tab hosted the lifeline port connection, see if there
   // are any other Dart tabs to connect to. Otherwise disconnect the port.
   if (_lifelineTab == removedTabId) {

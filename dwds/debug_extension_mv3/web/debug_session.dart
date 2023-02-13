@@ -270,6 +270,7 @@ Future<bool> _connectToDwds({
   await maybeCreateLifelinePort(dartAppTabId);
   // Send a DevtoolsRequest to the event stream:
   final tabUrl = await _getTabUrl(dartAppTabId);
+  debugLog('sending dev tools request: $tabUrl');
   debugSession.sendEvent(DevToolsRequest((b) => b
     ..appId = debugInfo.appId
     ..instanceId = debugInfo.appInstanceId
