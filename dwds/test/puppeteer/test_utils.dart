@@ -11,11 +11,14 @@ import 'package:puppeteer/puppeteer.dart';
 import '../fixtures/context.dart';
 import '../fixtures/utilities.dart';
 
-Future<String> buildDebugExtension() async {
+Future<String> buildDebugExtension({required bool isMV3}) async {
   final extensionDir = absolutePath(pathFromDwds: 'debug_extension_mv3');
   await Process.run(
     'dart',
-    [p.join('tool', 'build_extension.dart')],
+    [
+      p.join('tool', 'build_extension.dart'),
+      if (isMV3) '--mv3',
+    ],
     workingDirectory: extensionDir,
   );
   return p.join(extensionDir, 'compiled');

@@ -2,13 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-@OnPlatform({
-  // TODO(elliette): Enable on Windows.
-  'windows': Skip('https://github.com/dart-lang/webdev/issues/1724'),
-  // TODO(elliette): Enable on Linux.
-  'linux': Skip('https://github.com/dart-lang/webdev/issues/1787'),
-})
-@Timeout(Duration(minutes: 2))
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -29,12 +22,12 @@ final context = TestContext.withSoundNullSafety();
 
 enum Panel { debugger, inspector }
 
-void main() async {
-  group('MV3 Debug Extension', () {
+void testAll({required bool isMV3}) {
+  group('${isMV3 ? 'MV3' : 'MV2'} Debug Extension', () {
     late String extensionPath;
 
     setUpAll(() async {
-      extensionPath = await buildDebugExtension();
+      extensionPath = await buildDebugExtension(isMV3: isMV3);
     });
 
     for (var useSse in [true, false]) {
@@ -205,7 +198,6 @@ void main() async {
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
           await clickOnExtensionIcon(worker);
-          print('clicked, waiting for devtools');
           // Wait for DevTools to open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
