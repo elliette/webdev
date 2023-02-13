@@ -35,7 +35,6 @@ Future<void> maybeCreateLifelinePort(int tabId) async {
   debugLog('Creating lifeline port.');
   _lifelineTab = tabId;
   await injectScript('lifeline_connection.dart.js', tabId: tabId);
-  debugLog('done creating lifeline port');
 }
 
 void maybeRemoveLifelinePort(int removedTabId) {

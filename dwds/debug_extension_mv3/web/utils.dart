@@ -71,12 +71,11 @@ Future<bool> removeTab(int tabId) {
 
 Future<bool> injectScript(String scriptName, {required int tabId}) async {
   if (isMV3) {
-    debugLog('execute script');
-    await promiseToFuture(_executeScriptMV3(_InjectDetails(
-      target: Target(tabId: tabId),
-      files: [scriptName],
-    )));
-    debugLog('done execute script');
+    await promiseToFuture(_executeScriptMV3(
+        _InjectDetails(
+          target: Target(tabId: tabId),
+          files: [scriptName],
+        )));
     return true;
   } else {
     debugWarn('Script injection is only supported in Manifest V3.');
@@ -139,7 +138,9 @@ String addQueryParameters(
 }
 
 @JS('chrome.scripting.executeScript')
-external Object _executeScriptMV3(_InjectDetails details);
+external Object _executeScriptMV3(
+  _InjectDetails details
+);
 
 @JS()
 @anonymous
