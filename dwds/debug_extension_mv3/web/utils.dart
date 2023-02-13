@@ -70,27 +70,46 @@ Future<bool> removeTab(int tabId) {
 
 Future<bool> injectScript(String scriptName, {required int tabId}) {
   final completer = Completer<bool>();
-  chrome.scripting.executeScript(
-      InjectDetails(
-        target: Target(tabId: tabId),
-        files: [scriptName],
-      ), allowInterop(() {
-    completer.complete(true);
-  }));
+  if (isMV3) {
+    _executeScriptMV3(
+        _InjectDetails(
+          target: Target(tabId: tabId),
+          files: [scriptName],
+        ), allowInterop(() {
+      completer.complete(true);
+    }));
+  } else {
+    _executeScriptMV2(
+        tabId,
+        _TabInjectDetails(
+          file: scriptName,
+        ), allowInterop(() {
+      completer.complete(true);
+    }));
+  }
   return completer.future;
 }
 
 void onExtensionIconClicked(void Function(Tab) callback) {
-  chrome.action.onClicked.addListener(callback);
+  if (isMV3) {
+    _onExtensionIconClickedMV3(callback);
+  } else {
+    _onExtensionIconClickedMV2(callback);
+  }
 }
 
-void setExtensionIcon(IconInfo info) {
-  chrome.action.setIcon(info, /*callback*/ null);
+void setExtensionIcon(String path) {
+  final info = _IconInfo(path: path);
+  if (isMV3) {
+    _setExtensionIconMV3(info, /*callback*/ null);
+  } else {
+    _setExtensionIconMV2(info, /*callback*/ null);
+  }
 }
 
 bool? _isDevMode;
 
-bool isDevMode() {
+bool get isDevMode {
   if (_isDevMode != null) {
     return _isDevMode!;
   }
@@ -102,7 +121,7 @@ bool isDevMode() {
 
 bool? _isMV3;
 
-bool isMV3() {
+bool get isMV3 {
   if (_isMV3 != null) {
     return _isMV3!;
   }
@@ -123,4 +142,66 @@ String addQueryParameters(
     ...queryParameters,
   });
   return newUri.toString();
+}
+
+@JS('chrome.tabs.executeScript')
+external void _executeScriptMV2(
+  int? tabId,
+  _TabInjectDetails details,
+  Function()? callback,
+);
+
+@JS()
+@anonymous
+class _TabInjectDetails<T, U> {
+  external bool? get allFrames;
+  external String? get code;
+  external String? get file;
+  external int? get frameId;
+  external factory _TabInjectDetails({
+    bool? allFrames,
+    String? code,
+    String? file,
+    int? frameId,
+  });
+}
+
+@JS('chrome.scripting.executeScript')
+external void _executeScriptMV3(
+  _InjectDetails details,
+  Function? callback,
+);
+
+@JS()
+@anonymous
+class _InjectDetails<T, U> {
+  external Target get target;
+  external T? get func;
+  external List<U?>? get args;
+  external List<String>? get files;
+  external factory _InjectDetails({
+    Target target,
+    T? func,
+    List<U>? args,
+    List<String>? files,
+  });
+}
+
+@JS('chrome.browserAction.onClicked.addListener')
+external void _onExtensionIconClickedMV2(void Function(Tab tab) callback);
+
+@JS('chrome.action.onClicked.addListener')
+external void _onExtensionIconClickedMV3(void Function(Tab tab) callback);
+
+@JS('chrome.browserAction.setIcon')
+external void _setExtensionIconMV2(_IconInfo iconInfo, Function? callback);
+
+@JS('chrome.action.setIcon')
+external void _setExtensionIconMV3(_IconInfo iconInfo, Function? callback);
+
+@JS()
+@anonymous
+class _IconInfo {
+  external String get path;
+  external factory _IconInfo({required String path});
 }

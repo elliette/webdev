@@ -138,14 +138,13 @@ void _updateIcon(int activeTabId) async {
 }
 
 void _setDebuggableIcon() {
-  setExtensionIcon(IconInfo(path: 'static_assets/dart.png'));
+  setExtensionIcon('static_assets/dart.png');
 }
 
 void _setDefaultIcon() {
-  final iconPath = isDevMode()
-      ? 'static_assets/dart_dev.png'
-      : 'static_assets/dart_grey.png';
-  setExtensionIcon(IconInfo(path: iconPath));
+  final iconPath =
+      isDevMode ? 'static_assets/dart_dev.png' : 'static_assets/dart_grey.png';
+  setExtensionIcon(iconPath);
 }
 
 Future<DebugInfo?> _fetchDebugInfo(int tabId) {
