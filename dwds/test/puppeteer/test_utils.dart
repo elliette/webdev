@@ -69,15 +69,32 @@ Future<Worker> getServiceWorker(Browser browser) async {
   final serviceWorkerTarget =
       await browser.waitForTarget((target) => target.type == 'service_worker');
   final worker = (await serviceWorkerTarget.worker)!;
-  return Worker(worker.client, worker.url, onConsoleApiCalled: (type, jsHandle, stackTraceData) {
-    print('$type: $jsHandle');
-  }, onExceptionThrown: null,);
+  return Worker(
+    worker.client,
+    worker.url,
+    onConsoleApiCalled: (type, jsHandles, _) {
+      for (var handle in jsHandles) {
+        logConsoleMsg(type: '$type', msg: '$handle');
+      }
+    },
+    onExceptionThrown: null,
+  );
 }
 
 Future<Page> getBackgroundPage(Browser browser) async {
   final backgroundPageTarget =
       await browser.waitForTarget((target) => target.type == 'background_page');
-  return await backgroundPageTarget.page;
+  final backgroundPage = await backgroundPageTarget.page;
+  backgroundPage.onConsole.listen((msg) {
+    logConsoleMsg(type: '${msg.type}', msg: msg.text ?? '');
+  });
+  return backgroundPage;
+}
+
+void logConsoleMsg({required String type, required String msg}) {
+  if (msg.isEmpty) return;
+  final formattedMsg = msg.startsWith('JSHandle:') ? msg.substring(9) : msg;
+  print('console.$type: $formattedMsg');
 }
 
 Future<void> clickOnExtensionIcon(
