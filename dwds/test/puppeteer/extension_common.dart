@@ -48,6 +48,9 @@ void testAll({required bool isMV3}) {
             worker = await getServiceWorker(browser);
           } else {
             backgroundPage = await getBackgroundPage(browser);
+            backgroundPage?.onConsole.listen((msg) {
+              print('console.${msg.type}: ${msg.text}');
+            });
           }
 
           // Navigate to the Chrome extension page instead of the blank tab
@@ -164,9 +167,11 @@ void testAll({required bool isMV3}) {
             worker: worker,
             backgroundPage: backgroundPage,
           );
+          print('1');
           // Verify the extension opened DevTools in the same window:
           var devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
+          print('2');
           var devToolsTab = await devToolsTabTarget.page;
           var devToolsWindowId = await _getWindowId(
             devToolsTab.url!,
@@ -178,48 +183,59 @@ void testAll({required bool isMV3}) {
             worker: worker,
             backgroundPage: backgroundPage,
           );
+          print('3');
           expect(devToolsWindowId == appWindowId, isTrue);
           // Close the DevTools tab:
           devToolsTab = await devToolsTabTarget.page;
           await devToolsTab.close();
+          print('4');
           // Navigate to the extension settings page:
           final extensionOrigin = getExtensionOrigin(browser);
+          print('5');
           final settingsTab = await navigateToPage(
             browser,
             url: '$extensionOrigin/static_assets/settings.html',
             isNew: true,
           );
+          print('6');
           // Set the settings to open DevTools in a new window:
           await settingsTab.tap('#windowOpt');
           await settingsTab.tap('#saveButton');
           // Wait for the saved message to verify settings have been saved:
           await settingsTab.waitForSelector('.show');
+          print('7');
           // Close the settings tab:
           await settingsTab.close();
           // Navigate to the Dart app:
           await navigateToPage(browser, url: appUrl);
           // Click on the Dart Debug Extension icon:
+          print('8');
           await clickOnExtensionIcon(
             worker: worker,
             backgroundPage: backgroundPage,
           );
+          print('9');
           // Verify the extension opened DevTools in a different window:
           devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
+          print('10');
           devToolsTab = await devToolsTabTarget.page;
           devToolsWindowId = await _getWindowId(
             devToolsTab.url!,
             worker: worker,
             backgroundPage: backgroundPage,
           );
+          print('11');
           appWindowId = await _getWindowId(
             appUrl,
             worker: worker,
             backgroundPage: backgroundPage,
           );
+          print('12');
           expect(devToolsWindowId == appWindowId, isFalse);
           // Close the DevTools tab:
           devToolsTab = await devToolsTabTarget.page;
+          print('13');
           await devToolsTab.close();
           await appTab.close();
         });

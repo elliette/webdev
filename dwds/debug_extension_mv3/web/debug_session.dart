@@ -7,7 +7,6 @@ library debug_session;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
 
 import 'package:built_collection/built_collection.dart';
 import 'package:collection/collection.dart' show IterableExtension;
@@ -108,9 +107,10 @@ void attachDebugger(int dartAppTabId, {required Trigger trigger}) async {
   // Check if a debugger is already attached:
   final existingDebuggerLocation = _debuggerLocation(dartAppTabId);
   if (existingDebuggerLocation != null) {
-    return _showWarningNotification(
-      'Already debugging in ${existingDebuggerLocation.displayName}.',
-    );
+    final alreadyDebuggingWarning =
+        'Already debugging in ${existingDebuggerLocation.displayName}.';
+    debugWarn(alreadyDebuggingWarning);
+    return _showWarningNotification(alreadyDebuggingWarning);
   }
 
   // Verify that the user is authenticated:
@@ -136,15 +136,15 @@ void detachDebugger(
   final debugSession = _debugSessionForTab(tabId, type: type);
   if (debugSession == null) return;
   final debuggee = Debuggee(tabId: debugSession.appTabId);
-  final detachPromise = chrome.debugger.detach(debuggee);
-  await promiseToFuture(detachPromise);
-  final error = chrome.runtime.lastError;
-  if (error != null) {
-    debugWarn(
-        'Error detaching tab for reason: $reason. Error: ${error.message}');
-  } else {
-    _handleDebuggerDetach(debuggee, reason);
-  }
+  chrome.debugger.detach(debuggee, allowInterop(() {
+    final error = chrome.runtime.lastError;
+    if (error != null) {
+      debugWarn(
+          'Error detaching tab for reason: $reason. Error: ${error.message}');
+    } else {
+      _handleDebuggerDetach(debuggee, reason);
+    }
+  }));
 }
 
 void _registerDebugEventListeners() {

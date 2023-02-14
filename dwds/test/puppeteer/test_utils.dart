@@ -68,7 +68,10 @@ Future evaluate(String jsExpression,
 Future<Worker> getServiceWorker(Browser browser) async {
   final serviceWorkerTarget =
       await browser.waitForTarget((target) => target.type == 'service_worker');
-  return (await serviceWorkerTarget.worker)!;
+  final worker = (await serviceWorkerTarget.worker)!;
+  return Worker(worker.client, worker.url, onConsoleApiCalled: (type, jsHandle, stackTraceData) {
+    print('$type: $jsHandle');
+  }, onExceptionThrown: null,);
 }
 
 Future<Page> getBackgroundPage(Browser browser) async {
