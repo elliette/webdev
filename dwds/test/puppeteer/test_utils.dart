@@ -55,14 +55,35 @@ Future<Browser> setUpExtensionTest(
   );
 }
 
+Future evaluate(String jsExpression,
+    {Worker? worker, Page? backgroundPage}) async {
+  if (worker != null) {
+    assert(backgroundPage == null);
+    return worker.evaluate(jsExpression);
+  } else {
+    return backgroundPage!.evaluate(jsExpression);
+  }
+}
+
 Future<Worker> getServiceWorker(Browser browser) async {
   final serviceWorkerTarget =
       await browser.waitForTarget((target) => target.type == 'service_worker');
   return (await serviceWorkerTarget.worker)!;
 }
 
-Future<void> clickOnExtensionIcon(Worker worker) async {
-  return worker.evaluate(_clickIconJs);
+Future<Page> getBackgroundPage(Browser browser) async {
+  final backgroundPageTarget =
+      await browser.waitForTarget((target) => target.type == 'background_page');
+  return await backgroundPageTarget.page;
+}
+
+Future<void> clickOnExtensionIcon(
+    {Worker? worker, Page? backgroundPage}) async {
+  return evaluate(
+    _clickIconJs(isMV3: worker != null),
+    worker: worker,
+    backgroundPage: backgroundPage,
+  );
 }
 
 // Note: The following delay is required to reduce flakiness. It makes
@@ -108,10 +129,11 @@ Future<Page> _getPageForUrl(Browser browser, {required String url}) {
   return pageTarget.page;
 }
 
-final _clickIconJs = '''
+String _clickIconJs({bool isMV3 = false}) => '''
   async () => {
-    const activeTabs = await chrome.tabs.query({ active: true });
-    const tab = activeTabs[0];
-    chrome.action.onClicked.dispatch(tab);
+    const activeTabs = await chrome.tabs.query({ active: true }, (activeTabs) => {
+      const tab = activeTabs[0];
+      chrome.${isMV3 ? 'action' : 'browserAction'}.onClicked.dispatch(tab);
+    });
   }
 ''';

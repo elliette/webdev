@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:collection/collection.dart';
 import 'package:dwds/data/debug_info.dart';
+import 'package:http/http.dart';
 import 'package:path/path.dart' as p;
 import 'package:puppeteer/puppeteer.dart';
 import 'package:test/test.dart';
@@ -33,7 +34,8 @@ void testAll({required bool isMV3}) {
     for (var useSse in [true, false]) {
       group(useSse ? 'connected with SSE:' : 'connected with WebSockets:', () {
         late Browser browser;
-        late Worker worker;
+        Worker? worker;
+        Page? backgroundPage;
 
         setUpAll(() async {
           browser = await setUpExtensionTest(
@@ -42,7 +44,11 @@ void testAll({required bool isMV3}) {
             serveDevTools: true,
             useSse: useSse,
           );
-          worker = await getServiceWorker(browser);
+          if (isMV3) {
+            worker = await getServiceWorker(browser);
+          } else {
+            backgroundPage = await getBackgroundPage(browser);
+          }
 
           // Navigate to the Chrome extension page instead of the blank tab
           // opened by Chrome. This is helpful for local debugging.
@@ -52,7 +58,10 @@ void testAll({required bool isMV3}) {
 
         tearDown(() async {
           await workerEvalDelay();
-          await worker.evaluate(_clearStorageJs());
+          await _clearStorage(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           await workerEvalDelay();
         });
 
@@ -68,12 +77,17 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Verify that we have debug info for the Dart app:
           await workerEvalDelay();
-          final appTabId = await _getTabId(appUrl, worker: worker);
+          final appTabId = await _getTabId(
+            appUrl,
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           final debugInfoKey = '$appTabId-debugInfo';
           final debugInfo = await _fetchStorageObj<DebugInfo>(
             debugInfoKey,
             storageArea: 'session',
             worker: worker,
+            backgroundPage: backgroundPage,
           );
           expect(debugInfo.appId, isNotNull);
           expect(debugInfo.appEntrypointPath, isNotNull);
@@ -92,12 +106,17 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Verify that we have debug info for the Dart app:
           await workerEvalDelay();
-          final appTabId = await _getTabId(appUrl, worker: worker);
+          final appTabId = await _getTabId(
+            appUrl,
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           final authKey = '$appTabId-isAuthenticated';
           final authenticated = await _fetchStorageObj<String>(
             authKey,
             storageArea: 'session',
             worker: worker,
+            backgroundPage: backgroundPage,
           );
           expect(authenticated, isNotNull);
           expect(authenticated, equals('true'));
@@ -125,6 +144,7 @@ void testAll({required bool isMV3}) {
             'devToolsOpener',
             storageArea: 'local',
             worker: worker,
+            backgroundPage: backgroundPage,
           );
           expect(devToolsOpener.newWindow, isTrue);
         });
@@ -140,7 +160,10 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           // Verify the extension opened DevTools in the same window:
           var devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -148,8 +171,13 @@ void testAll({required bool isMV3}) {
           var devToolsWindowId = await _getWindowId(
             devToolsTab.url!,
             worker: worker,
+            backgroundPage: backgroundPage,
           );
-          var appWindowId = await _getWindowId(appUrl, worker: worker);
+          var appWindowId = await _getWindowId(
+            appUrl,
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           expect(devToolsWindowId == appWindowId, isTrue);
           // Close the DevTools tab:
           devToolsTab = await devToolsTabTarget.page;
@@ -171,7 +199,10 @@ void testAll({required bool isMV3}) {
           // Navigate to the Dart app:
           await navigateToPage(browser, url: appUrl);
           // Click on the Dart Debug Extension icon:
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           // Verify the extension opened DevTools in a different window:
           devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -179,8 +210,13 @@ void testAll({required bool isMV3}) {
           devToolsWindowId = await _getWindowId(
             devToolsTab.url!,
             worker: worker,
+            backgroundPage: backgroundPage,
           );
-          appWindowId = await _getWindowId(appUrl, worker: worker);
+          appWindowId = await _getWindowId(
+            appUrl,
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           expect(devToolsWindowId == appWindowId, isFalse);
           // Close the DevTools tab:
           devToolsTab = await devToolsTabTarget.page;
@@ -197,7 +233,8 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+              worker: worker, backgroundPage: backgroundPage);
           // Wait for DevTools to open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -225,7 +262,10 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           // Verify that the Dart DevTools tab is open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -247,7 +287,8 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+              worker: worker, backgroundPage: backgroundPage);
           // Verify that the Dart DevTools tab is open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -267,21 +308,28 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+              worker: worker, backgroundPage: backgroundPage);
           // Wait for Dart Devtools to open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
           // There should be no warning notifications:
-          var chromeNotifications = await worker.evaluate(_getNotifications());
+          var chromeNotifications = await evaluate(
+            _getNotifications(),
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
           expect(chromeNotifications, isEmpty);
           // Navigate back to Dart app:
           await navigateToPage(browser, url: appUrl, isNew: false);
           // Click on the Dart Debug Extension icon again:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+              worker: worker, backgroundPage: backgroundPage);
           await workerEvalDelay();
           // There should now be a warning notificiation:
-          chromeNotifications = await worker.evaluate(_getNotifications());
+          chromeNotifications = await evaluate(_getNotifications(),
+              worker: worker, backgroundPage: backgroundPage);
           expect(chromeNotifications, isNotEmpty);
           // Close the Dart app and the associated Dart DevTools:
           await appTab.close();
@@ -298,7 +346,8 @@ void testAll({required bool isMV3}) {
               await navigateToPage(browser, url: appUrl, isNew: true);
           // Click on the Dart Debug Extension icon:
           await workerEvalDelay();
-          await clickOnExtensionIcon(worker);
+          await clickOnExtensionIcon(
+              worker: worker, backgroundPage: backgroundPage);
           // Verify that the Dart DevTools tab is open:
           final devToolsTabTarget = await browser.waitForTarget(
               (target) => target.url.contains(devToolsUrlFragment));
@@ -320,7 +369,8 @@ void testAll({required bool isMV3}) {
       for (var isFlutterApp in [true, false]) {
         group(isFlutterApp ? 'Flutter app:' : 'Dart app:', () {
           late Browser browser;
-          late Worker worker;
+          Worker? worker;
+          Page? backgroundPage;
 
           setUpAll(() async {
             browser = await setUpExtensionTest(
@@ -331,13 +381,19 @@ void testAll({required bool isMV3}) {
               isFlutterApp: isFlutterApp,
               openChromeDevTools: true,
             );
-
-            worker = await getServiceWorker(browser);
+            if (isMV3) {
+              worker = await getServiceWorker(browser);
+            } else {
+              backgroundPage = await getBackgroundPage(browser);
+            }
           });
 
           tearDown(() async {
             await workerEvalDelay();
-            await worker.evaluate(_clearStorageJs());
+            await _clearStorage(
+              worker: worker,
+              backgroundPage: backgroundPage,
+            );
           });
 
           tearDownAll(() async {
@@ -352,12 +408,17 @@ void testAll({required bool isMV3}) {
                 await navigateToPage(browser, url: appUrl, isNew: true);
             // Verify that we have debug info for the Dart app:
             await workerEvalDelay();
-            final appTabId = await _getTabId(appUrl, worker: worker);
+            final appTabId = await _getTabId(
+              appUrl,
+              worker: worker,
+              backgroundPage: backgroundPage,
+            );
             final debugInfoKey = '$appTabId-debugInfo';
             final debugInfo = await _fetchStorageObj<DebugInfo>(
               debugInfoKey,
               storageArea: 'session',
               worker: worker,
+              backgroundPage: backgroundPage,
             );
             expect(debugInfo.isInternalBuild, equals(false));
             expect(debugInfo.isFlutterApp, equals(isFlutterApp));
@@ -396,7 +457,8 @@ void testAll({required bool isMV3}) {
       for (var isFlutterApp in [true, false]) {
         group(isFlutterApp ? 'Flutter app:' : 'Dart app:', () {
           late Browser browser;
-          late Worker worker;
+          Worker? worker;
+          Page? backgroundPage;
 
           setUpAll(() async {
             browser = await setUpExtensionTest(
@@ -412,6 +474,7 @@ void testAll({required bool isMV3}) {
             );
 
             worker = await getServiceWorker(browser);
+            backgroundPage = await getBackgroundPage(browser);
           });
 
           setUp(() async {
@@ -427,7 +490,10 @@ void testAll({required bool isMV3}) {
 
           tearDown(() async {
             await workerEvalDelay();
-            await worker.evaluate(_clearStorageJs());
+            await _clearStorage(
+              worker: worker,
+              backgroundPage: backgroundPage,
+            );
             await workerEvalDelay();
           });
 
@@ -440,12 +506,17 @@ void testAll({required bool isMV3}) {
             final appUrl = context.appUrl;
             // Verify that we have debug info for the Dart app:
             await workerEvalDelay();
-            final appTabId = await _getTabId(appUrl, worker: worker);
+            final appTabId = await _getTabId(
+              appUrl,
+              worker: worker,
+              backgroundPage: backgroundPage,
+            );
             final debugInfoKey = '$appTabId-debugInfo';
             final debugInfo = await _fetchStorageObj<DebugInfo>(
               debugInfoKey,
               storageArea: 'session',
               worker: worker,
+              backgroundPage: backgroundPage,
             );
             expect(debugInfo.isInternalBuild, equals(true));
             expect(debugInfo.isFlutterApp, equals(isFlutterApp));
@@ -590,7 +661,8 @@ void testAll({required bool isMV3}) {
       );
       final fakeAppUrl = 'file://$fakeAppPath';
       late Browser browser;
-      late Worker worker;
+      Worker? worker;
+      Page? backgroundPage;
 
       setUpAll(() async {
         browser = await puppeteer.launch(
@@ -603,6 +675,7 @@ void testAll({required bool isMV3}) {
           ],
         );
         worker = await getServiceWorker(browser);
+        backgroundPage = await getBackgroundPage(browser);
         // Navigate to the Chrome extension page instead of the blank tab
         // opened by Chrome. This is helpful for local debugging.
         final blankTab = await navigateToPage(browser, url: 'about:blank');
@@ -611,7 +684,10 @@ void testAll({required bool isMV3}) {
 
       tearDown(() async {
         await workerEvalDelay();
-        await worker.evaluate(_clearStorageJs());
+        await _clearStorage(
+          worker: worker,
+          backgroundPage: backgroundPage,
+        );
         await workerEvalDelay();
       });
 
@@ -626,13 +702,16 @@ void testAll({required bool isMV3}) {
         // Navigate to the "Dart" app:
         await navigateToPage(browser, url: fakeAppUrl, isNew: true);
         // Verify that we have debug info for the fake "Dart" app:
-        final appTabId = await _getTabId(fakeAppUrl, worker: worker);
-        final debugInfoKey = '$appTabId-debugInfo';
-        final debugInfo = await _fetchStorageObj<DebugInfo>(
-          debugInfoKey,
-          storageArea: 'session',
+        final appTabId = await _getTabId(
+          fakeAppUrl,
           worker: worker,
+          backgroundPage: backgroundPage,
         );
+        final debugInfoKey = '$appTabId-debugInfo';
+        final debugInfo = await _fetchStorageObj<DebugInfo>(debugInfoKey,
+            storageArea: 'session',
+            worker: worker,
+            backgroundPage: backgroundPage);
         expect(debugInfo.appId, equals('DART_APP_ID'));
         expect(debugInfo.appEntrypointPath, equals('DART_ENTRYPOINT_PATH'));
         expect(debugInfo.appInstanceId, equals('DART_APP_INSTANCE_ID'));
@@ -707,32 +786,61 @@ void _tabLeft(Page chromeDevToolsPage) async {
   await chromeDevToolsPage.keyboard.up(modifierKey);
 }
 
-Future<int> _getTabId(
+Future<int?> _getTabId(
   String url, {
-  required Worker worker,
+  Worker? worker,
+  Page? backgroundPage,
 }) async {
   final jsExpression = _tabIdForTabJs(url);
-  return (await worker.evaluate(jsExpression)) as int;
+  return (await evaluate(
+    jsExpression,
+    worker: worker,
+    backgroundPage: backgroundPage,
+  )) as int?;
+}
+
+Future<void> _clearStorage({
+  Worker? worker,
+  Page? backgroundPage,
+}) async {
+  final jsExpression = _clearStorageJs(isMV3: worker != null);
+  return evaluate(
+    jsExpression,
+    worker: worker,
+    backgroundPage: backgroundPage,
+  );
 }
 
 Future<int?> _getWindowId(
   String url, {
-  required Worker worker,
+  Worker? worker,
+  Page? backgroundPage,
 }) async {
   final jsExpression = _windowIdForTabJs(url);
-  return (await worker.evaluate(jsExpression)) as int?;
+  return (await evaluate(
+    jsExpression,
+    worker: worker,
+    backgroundPage: backgroundPage,
+  )) as int?;
 }
 
 Future<T> _fetchStorageObj<T>(
   String storageKey, {
   required String storageArea,
-  required Worker worker,
+  Worker? worker,
+  Page? backgroundPage,
 }) async {
+  final isMV3 = worker != null;
   final json = await retryFnAsync<String>(() async {
-    final storageObj = await worker.evaluate(_fetchStorageObjJs(
+    final jsExpression = _fetchStorageObjJs(
       storageKey,
-      storageArea: storageArea,
-    ));
+      storageArea: isMV3 ? storageArea : 'local',
+    );
+    final storageObj = await evaluate(
+      jsExpression,
+      worker: worker,
+      backgroundPage: backgroundPage,
+    );
     return storageObj[storageKey];
   });
   if (T == String) return json as T;
@@ -742,9 +850,12 @@ Future<T> _fetchStorageObj<T>(
 String _tabIdForTabJs(String tabUrl) {
   return '''
     async () => {
-      const matchingTabs = await chrome.tabs.query({ url: "$tabUrl" });
-      const tab = matchingTabs[0];
-      return tab.id;
+      return new Promise((resolve, reject) => {
+        chrome.tabs.query({url:  "$tabUrl"}, (tabs) => {
+          const tab = tabs[0];
+          resolve(tab.id);
+        });
+      });
     }
 ''';
 }
@@ -752,9 +863,12 @@ String _tabIdForTabJs(String tabUrl) {
 String _windowIdForTabJs(String tabUrl) {
   return '''
     async () => {
-      const matchingTabs = await chrome.tabs.query({ url: "$tabUrl" });
-      const tab = matchingTabs[0];
-      return tab.windowId;
+      return new Promise((resolve, reject) => {
+        chrome.tabs.query({url:  "$tabUrl"}, (tabs) => {
+          const tab = tabs[0];
+          resolve(tab.windowId);
+        });
+      });
     }
 ''';
 }
@@ -779,11 +893,11 @@ String _fetchStorageObjJs(
 ''';
 }
 
-String _clearStorageJs() {
+String _clearStorageJs({bool isMV3 = true}) {
   return '''
     async () => {
       await chrome.storage.local.clear();
-      await chrome.storage.session.clear();
+      ${isMV3 ? 'await chrome.storage.session.clear();' : ''}
       return true;
     }
 ''';
