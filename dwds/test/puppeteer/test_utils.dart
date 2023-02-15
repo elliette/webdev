@@ -13,12 +13,14 @@ import '../fixtures/context.dart';
 import '../fixtures/utilities.dart';
 
 enum ConsoleSource {
-  worker,
+  background,
   devTools,
+  worker,
 }
 
-final _workerLogs = [];
-final _devToolsLogs = [];
+final _backgroundLogs = <String>[];
+final _devToolsLogs = <String>[];
+final _workerLogs = <String>[];
 
 Future<String> buildDebugExtension({required bool isMV3}) async {
   final extensionDir = absolutePath(pathFromDwds: 'debug_extension_mv3');
@@ -64,11 +66,12 @@ Future<Browser> setUpExtensionTest(
   );
 }
 
-Future<void> tearDownHelper({required Worker worker}) async {
+Future<void> tearDownHelper({Worker? worker, Page? backgroundPage}) async {
   _logConsoleMsgsOnFailure();
-  _workerLogs.clear();
+  _backgroundLogs.clear();
   _devToolsLogs.clear();
-  await worker.evaluate(_clearStorageJs).catchError((_) {});
+  _workerLogs.clear();
+  await _clearStorage(worker: worker, backgroundPage: backgroundPage);
 }
 
 Future<Worker> getServiceWorker(Browser browser) async {
@@ -80,12 +83,26 @@ Future<Worker> getServiceWorker(Browser browser) async {
     worker.url,
     onConsoleApiCalled: (type, jsHandles, _) {
       for (var handle in jsHandles) {
-        saveConsoleMsg(
+        _saveConsoleMsg(
             source: ConsoleSource.worker, type: '$type', msg: '$handle');
       }
     },
     onExceptionThrown: null,
   );
+}
+
+Future<Page> getBackgroundPage(Browser browser) async {
+  final backgroundPageTarget =
+      await browser.waitForTarget((target) => target.type == 'background_page');
+  final backgroundPage = await backgroundPageTarget.page;
+  backgroundPage.onConsole.listen((msg) {
+    _saveConsoleMsg(
+      source: ConsoleSource.background,
+      type: '${msg.type}',
+      msg: msg.text ?? '',
+    );
+  });
+  return backgroundPage;
 }
 
 Future<Page> getChromeDevToolsPage(Browser browser) async {
@@ -94,7 +111,7 @@ Future<Page> getChromeDevToolsPage(Browser browser) async {
   chromeDevToolsTarget.type = 'page';
   final chromeDevToolsPage = await chromeDevToolsTarget.page;
   chromeDevToolsPage.onConsole.listen((msg) {
-    saveConsoleMsg(
+    _saveConsoleMsg(
       source: ConsoleSource.devTools,
       type: '${msg.type}',
       msg: msg.text ?? '',
@@ -103,21 +120,13 @@ Future<Page> getChromeDevToolsPage(Browser browser) async {
   return chromeDevToolsPage;
 }
 
-void saveConsoleMsg({
-  required ConsoleSource source,
-  required String type,
-  required String msg,
-}) {
-  if (msg.isEmpty) return;
-  final consiseMsg = msg.startsWith('JSHandle:') ? msg.substring(9) : msg;
-  final formatted = 'console.$type: $consiseMsg';
-  switch (source) {
-    case ConsoleSource.worker:
-      _workerLogs.add(formatted);
-      break;
-    case ConsoleSource.devTools:
-      _devToolsLogs.add(formatted);
-      break;
+Future evaluate(String jsExpression,
+    {Worker? worker, Page? backgroundPage}) async {
+  if (worker != null) {
+    assert(backgroundPage == null);
+    return worker.evaluate(jsExpression);
+  } else {
+    return backgroundPage!.evaluate(jsExpression);
   }
 }
 
@@ -159,7 +168,31 @@ String getExtensionOrigin(Browser browser) {
   return '$chromeExtension//$extensionId';
 }
 
+void _saveConsoleMsg({
+  required ConsoleSource source,
+  required String type,
+  required String msg,
+}) {
+  if (msg.isEmpty) return;
+  final consiseMsg = msg.startsWith('JSHandle:') ? msg.substring(9) : msg;
+  final formatted = 'console.$type: $consiseMsg';
+  switch (source) {
+    case ConsoleSource.background:
+      _backgroundLogs.add(formatted);
+      break;
+    case ConsoleSource.devTools:
+      _devToolsLogs.add(formatted);
+      break;
+    case ConsoleSource.worker:
+      _workerLogs.add(formatted);
+      break;
+  }
+}
+
 void _logConsoleMsgsOnFailure() {
+  if (_backgroundLogs.isNotEmpty) {
+    printOnFailure(['Background Page logs:', ..._backgroundLogs].join('\n'));
+  }
   if (_workerLogs.isNotEmpty) {
     printOnFailure(['Service Worker logs:', ..._workerLogs].join('\n'));
   }
@@ -177,6 +210,18 @@ Future<Page> _getPageForUrl(Browser browser, {required String url}) {
   return pageTarget.page;
 }
 
+Future<void> _clearStorage({
+  Worker? worker,
+  Page? backgroundPage,
+}) async {
+  final jsExpression = _clearStorageJs(isMV3: worker != null);
+  return evaluate(
+    jsExpression,
+    worker: worker,
+    backgroundPage: backgroundPage,
+  );
+}
+
 final _clickIconJs = '''
   async () => {
     const activeTabs = await chrome.tabs.query({ active: true });
@@ -185,10 +230,12 @@ final _clickIconJs = '''
   }
 ''';
 
-final _clearStorageJs = '''
+
+String _clearStorageJs({bool isMV3 = true}) {
+  return '''
     async () => {
       await chrome.storage.local.clear();
-      await chrome.storage.session.clear();
+      ${isMV3 ? 'await chrome.storage.session.clear();' : ''}
       return true;
     }
 ''';
