@@ -200,6 +200,7 @@ class TestContext {
     bool launchChrome = true,
     bool isFlutterApp = false,
     bool isInternalBuild = false,
+    bool allowEmbedding = false,
     List<String> experiments = const <String>[],
   }) async {
     // Generate missing SDK assets if needed.
@@ -416,6 +417,7 @@ class TestContext {
         ddcService,
         isFlutterApp,
         isInternalBuild,
+        allowEmbedding,
       );
 
       _appUrl = basePath.isEmpty

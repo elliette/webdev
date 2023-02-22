@@ -53,6 +53,7 @@ Future<Browser> setUpExtensionTest(
     enableDebugExtension: true,
     isInternalBuild: isInternalBuild,
     isFlutterApp: isFlutterApp,
+    allowEmbedding: true,
   );
   return await puppeteer.launch(
     devTools: openChromeDevTools,

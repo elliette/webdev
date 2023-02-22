@@ -82,6 +82,7 @@ class TestServer {
     ExpressionCompilerService? ddcService,
     bool isFlutterApp,
     bool isInternalBuild,
+    bool allowEmbedding,
   ) async {
     var pipeline = const Pipeline();
 
@@ -116,7 +117,7 @@ class TestServer {
         urlEncoder: urlEncoder,
         expressionCompiler: expressionCompiler,
         isInternalBuild: isInternalBuild,
-        isFlutterApp: isFlutterApp,
+        isFlutterApp: () => Future.value(isFlutterApp),
         devtoolsLauncher: serveDevTools
             ? (hostname) async {
                 final server = await DevToolsServer().serveDevTools(
@@ -132,16 +133,22 @@ class TestServer {
             : null);
 
     final server = await startHttpServer('localhost', port: port);
+    if (allowEmbedding) {
+      server.defaultResponseHeaders.remove('x-frame-options', 'SAMEORIGIN');
+    }
     var cascade = Cascade();
 
     cascade = cascade.add(dwds.handler).add(assetHandler);
 
+    pipeline =
+        pipeline.addMiddleware(_logRequests).addMiddleware(dwds.middleware);
+    if (allowEmbedding) {
+      pipeline = pipeline.addMiddleware(_allowEmbedding);
+    }
+
     serveHttpRequests(
         server,
-        pipeline
-            .addMiddleware(_logRequests)
-            .addMiddleware(dwds.middleware)
-            .addHandler(cascade.handler), (e, s) {
+        pipeline.addHandler(cascade.handler), (e, s) {
       _logger.warning('Error handling requests', e, s);
     });
 
@@ -153,6 +160,14 @@ class TestServer {
       autoRun,
       assetReader,
     );
+  }
+
+  static Handler _allowEmbedding(Handler innerHandler) {
+    return (Request request) async {
+      final response = await innerHandler(request);
+      // Remove the X-FRAME-OPTIONS header to allow embedding:
+      return response.change(headers: {'x-frame-options': null});
+    };
   }
 
   /// [Middleware] that logs all requests, inspired by [logRequests].

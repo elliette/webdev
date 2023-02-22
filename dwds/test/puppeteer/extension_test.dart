@@ -753,6 +753,7 @@ void main() async {
               pathFromDwds: p.join(
                 'test',
                 'puppeteer',
+                'fixtures',
                 'fake_app',
                 'index.html',
               ),
@@ -822,6 +823,85 @@ void main() async {
           expect(debugInfo.isFlutterApp, isFalse);
           expect(debugInfo.appOrigin, isNotNull);
           expect(debugInfo.appUrl, isNotNull);
+        });
+      });
+
+      group('connected to an app in an IFRAME', () {
+        final iframedAppPath = webCompatiblePath(
+          p.split(
+            absolutePath(
+              pathFromDwds: p.join(
+                'test',
+                'puppeteer',
+                'fixtures',
+                'iframed_app',
+                'index.html',
+              ),
+            ),
+          ),
+        );
+        final iframedAppUrl = 'file://$iframedAppPath';
+        late Browser browser;
+        late Page iframePage;
+        Worker? worker;
+        Page? backgroundPage;
+
+        setUpAll(() async {
+          browser = await setUpExtensionTest(
+            context,
+            extensionPath: extensionPath,
+            serveDevTools: true,
+            isInternalBuild: true,
+            useSse: true,
+            isFlutterApp: false,
+            openChromeDevTools: true,
+          );
+          if (isMV3) {
+            worker = await getServiceWorker(browser);
+          } else {
+            backgroundPage = await getBackgroundPage(browser);
+          }
+          // Navigate to the IFRAMED app page, and inject the Dart app into the 
+          // IFRAME.
+          final blankTab = await navigateToPage(browser, url: 'about:blank');
+          await blankTab.goto(iframedAppUrl);
+          iframePage = blankTab;
+        });
+
+        tearDown(() async {
+          await tearDownHelper(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
+        });
+
+        tearDownAll(() async {
+          await browser.close();
+        });
+
+        test('can debug a Dart app in an IFRAME', () async {
+          final jsExpression = _setIframeSrc(context.appUrl);
+          await iframePage.evaluate(jsExpression);
+          // Click on the Dart Debug Extension icon:
+          await workerEvalDelay();
+          await clickOnExtensionIcon(
+            worker: worker,
+            backgroundPage: backgroundPage,
+          );
+          // Wait for DevTools to open:
+          final devToolsUrlFragment = 'debugger?uri=sse';
+          final devToolsTabTarget = await browser.waitForTarget(
+              (target) => target.url.contains(devToolsUrlFragment));
+          final devToolsUrl = devToolsTabTarget.url;
+          // Expect the correct query parameters to be on the DevTools url:
+          final uri = Uri.parse(devToolsUrl);
+          final queryParameters = uri.queryParameters;
+          expect(queryParameters.keys, unorderedMatches(['uri', 'ide']));
+          expect(queryParameters, containsPair('ide', 'DebugExtension'));
+          expect(queryParameters, containsPair('uri', isNotEmpty));
+          // Close the DevTools tab:
+          final devToolsTab = await devToolsTabTarget.page;
+          await devToolsTab.close();
         });
       });
     });
@@ -1003,6 +1083,23 @@ String _getNotifications() {
 String _setMultipleAppsAttributeJs = '''
   document.documentElement.setAttribute("data-multiple-dart-apps", true);
 ''';
+
+String _setIframeSrcOld(String srcUrl) {
+  return '''
+    () => {
+      const iframe = document.querySelector('#dartIframe');
+      iframe.setAttribute('src', "$srcUrl");
+    }
+  ''';
+}
+
+String _setIframeSrc(String srcUrl) {
+  return '''
+    document.querySelector('#dartIframe').setAttribute('src', "$srcUrl");
+  ''';
+}
+
+
 
 // TODO(https://github.com/dart-lang/webdev/issues/1787): Compare to golden
 // images. Currently golden comparison is not set up, since this is only run
