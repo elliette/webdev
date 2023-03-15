@@ -70,7 +70,13 @@ class FrameComputer {
           await debugger.calculateDartFrameFor(callFrame, _frameIndex);
       if (dartFrame != null) {
         _dartFrames.add(dartFrame);
+      } else {
+        final jsFrame = debugger.calculateJsFrameFor(callFrame, _frameIndex);
+        if (jsFrame != null) {
+          _jsFrames.add(jsFrame);
+        }
       }
+      _frameIndex += 1;
     }
   }
 
