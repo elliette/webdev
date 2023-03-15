@@ -15,7 +15,8 @@ class FrameComputer {
   final _queue = AtomicQueue();
 
   final List<WipCallFrame> _callFrames;
-  final List<Frame> _computedFrames = [];
+  final List<Frame> _dartFrames = [];
+  final List<Frame> _jsFrames = [];
 
   var _frameIndex = 0;
 
@@ -36,8 +37,8 @@ class FrameComputer {
   /// [Frame]s.
   Future<List<Frame>> calculateFrames({int? limit}) async {
     return _queue.run(() async {
-      if (limit != null && _computedFrames.length >= limit) {
-        return _computedFrames.take(limit).toList();
+      if (limit != null && _dartFrames.length >= limit) {
+        return _dartFrames.take(limit).toList();
       }
       // TODO(grouma) - We compute the frames sequentially. Consider computing
       // frames in parallel batches.
@@ -46,24 +47,29 @@ class FrameComputer {
 
       // Remove any trailing kAsyncSuspensionMarker frame.
       if (limit == null &&
-          _computedFrames.isNotEmpty &&
-          _computedFrames.last.kind == FrameKind.kAsyncSuspensionMarker) {
-        _computedFrames.removeLast();
+          _dartFrames.isNotEmpty &&
+          _dartFrames.last.kind == FrameKind.kAsyncSuspensionMarker) {
+        _dartFrames.removeLast();
       }
 
-      return _computedFrames;
+      // Only show JS frames if we were unable to calculate any Dart frames.
+      if (_dartFrames.isEmpty && _jsFrames.isNotEmpty) {
+        return _jsFrames.take(limit ?? _jsFrames.length).toList();
+      }
+
+      return _dartFrames;
     });
   }
 
   Future<void> _collectSyncFrames({int? limit}) async {
     while (_frameIndex < _callFrames.length) {
-      if (limit != null && _computedFrames.length == limit) return;
+      if (limit != null && _dartFrames.length == limit) return;
 
       final callFrame = _callFrames[_frameIndex];
       final dartFrame =
-          await debugger.calculateDartFrameFor(callFrame, _frameIndex++);
+          await debugger.calculateDartFrameFor(callFrame, _frameIndex);
       if (dartFrame != null) {
-        _computedFrames.add(dartFrame);
+        _dartFrames.add(dartFrame);
       }
     }
   }
@@ -73,15 +79,15 @@ class FrameComputer {
 
     while (_asyncStackTrace != null) {
       final asyncStackTrace = _asyncStackTrace!;
-      if (limit != null && _computedFrames.length == limit) {
+      if (limit != null && _dartFrames.length == limit) {
         return;
       }
 
       // We are processing a new set of async frames, add a suspension marker.
       if (_asyncFramesToProcess == null) {
-        if (_computedFrames.isNotEmpty &&
-            _computedFrames.last.kind != FrameKind.kAsyncSuspensionMarker) {
-          _computedFrames.add(Frame(
+        if (_dartFrames.isNotEmpty &&
+            _dartFrames.last.kind != FrameKind.kAsyncSuspensionMarker) {
+          _dartFrames.add(Frame(
               index: _frameIndex++, kind: FrameKind.kAsyncSuspensionMarker));
         }
         _asyncFramesToProcess = asyncStackTrace.callFrames;
@@ -103,13 +109,23 @@ class FrameComputer {
 
           final frame = await debugger.calculateDartFrameFor(
             tempWipFrame,
-            _frameIndex++,
+            _frameIndex,
             populateVariables: false,
           );
           if (frame != null) {
             frame.kind = FrameKind.kAsyncCausal;
-            _computedFrames.add(frame);
+            _dartFrames.add(frame);
+          } else {
+            final jsFrame = debugger.calculateJsFrameFor(
+              tempWipFrame,
+              _frameIndex,
+              isAsync: true,
+            );
+            if (jsFrame != null) {
+              _dartFrames.add(jsFrame);
+            }
           }
+          _frameIndex += 1;
         }
       }
 
