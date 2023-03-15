@@ -599,11 +599,12 @@ class Debugger extends Domain {
     final jsFrame = Frame(
       index: frameIndex,
       code: CodeRef(
-        name: _createJsFrameName(funcName: frame.functionName, url: url),
+        name: frame.functionName.isEmpty? 'anonymous' : frame.functionName,
         kind: CodeKind.kNative,
         id: createId(),
       ),
       location: SourceLocation(
+        script: ScriptRef(uri: url, id: createId()),
         line: location.lineNumber,
         column: location.columnNumber,
       ),
@@ -611,13 +612,6 @@ class Debugger extends Domain {
     );
 
     return jsFrame;
-  }
-
-  String _createJsFrameName({required String funcName, required String? url}) {
-    final name = funcName.isEmpty ? 'anonymous' : funcName;
-    if (url == null) return name;
-    final fileName = Uri.parse(url).pathSegments.last;
-    return '$name $fileName';
   }
 
   /// Handles pause events coming from the Chrome connection.
