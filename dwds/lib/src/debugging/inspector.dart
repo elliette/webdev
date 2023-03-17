@@ -540,8 +540,18 @@ class AppInspector implements AppInspectorInterface {
           .scripts;
       // For all the non-dart: libraries, find their parts and create scriptRefs
       // for them.
-      final userLibraries =
-          libraryUris.where((uri) => !uri.startsWith('dart:'));
+      final nonDartLibraries = [];
+      final entrypointLibraries = [];
+      for (final uri in libraryUris) {
+        if (uri.startsWith('org-dartlang-app')) {
+          entrypointLibraries.add(uri);
+        } else if (!uri.startsWith('dart:')) {
+          nonDartLibraries.add(uri);
+        }
+      }
+
+      final userLibraries = [...nonDartLibraries, ...entrypointLibraries];
+      print('FIRST LIBRARY: ${userLibraries.first}');
       for (var uri in userLibraries) {
         final parts = scripts[uri];
         final scriptRefs = [
@@ -566,6 +576,8 @@ class AppInspector implements AppInspectorInterface {
           }
         }
       }
+      final scriptRefs = _scriptRefsById.values;
+      print('FIRST SCRIPT: ${scriptRefs.first.uri}');
       return _scriptRefsById.values.toList();
     });
   }

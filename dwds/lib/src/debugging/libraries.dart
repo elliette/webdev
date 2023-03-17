@@ -28,10 +28,19 @@ class LibraryHelper extends Domain {
   }
 
   Future<LibraryRef> get rootLib async {
+    print('root lib here is $_rootLib');
     if (_rootLib != null) return _rootLib!;
     // TODO: read entrypoint from app metadata.
     // Issue: https://github.com/dart-lang/webdev/issues/1290
     final libraries = await libraryRefs;
+    for (var i = 0; i < libraries.length; i++) {
+      final library = libraries[i];
+      final name = library.name ?? '';
+      if (name.contains('main') || name.contains('org-dartlang') || i <  35) {
+        print('[$i] $name (${library.uri})');        
+      }
+    }
+
     _rootLib = libraries
         .firstWhereOrNull((lib) => lib.name?.contains('org-dartlang') ?? false);
     _rootLib = _rootLib ??
