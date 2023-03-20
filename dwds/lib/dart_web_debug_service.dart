@@ -85,6 +85,7 @@ class Dwds {
     bool emitDebugEvents = true,
     bool isInternalBuild = false,
     Future<bool> Function()? isFlutterApp,
+    String? entrypointPath,
   }) async {
     globalLoadStrategy = loadStrategy;
     isFlutterApp ??= () => Future.value(true);
@@ -145,6 +146,7 @@ class Dwds {
       injected,
       spawnDds,
       launchDevToolsInNewWindow,
+      entrypointPath
     );
 
     return Dwds._(

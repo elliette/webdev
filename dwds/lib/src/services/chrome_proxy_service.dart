@@ -28,7 +28,7 @@ import 'package:dwds/src/utilities/shared.dart';
 import 'package:logging/logging.dart' hide LogRecord;
 import 'package:pub_semver/pub_semver.dart' as semver;
 import 'package:vm_service/vm_service.dart';
-import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart';
+import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart' hide StackTrace;
 
 /// A proxy from the chrome debug protocol to the dart vm service protocol.
 class ChromeProxyService implements VmServiceInterface {
@@ -129,6 +129,7 @@ class ChromeProxyService implements VmServiceInterface {
     AppConnection appConnection,
     ExecutionContext executionContext,
     ExpressionCompiler? expressionCompiler,
+    String? entrypointPath,   
   ) async {
     final vm = VM(
       name: 'ChromeDebugProxy',
@@ -159,7 +160,9 @@ class ChromeProxyService implements VmServiceInterface {
       executionContext,
       expressionCompiler,
     );
-    safeUnawaited(service.createIsolate(appConnection));
+    print('CREATING CHROME PROXY SERIVCE ISOALTE');
+    print(StackTrace.current);
+    safeUnawaited(service.createIsolate(appConnection, entrypointPath));
     return service;
   }
 
@@ -229,7 +232,7 @@ class ChromeProxyService implements VmServiceInterface {
   /// Only one isolate at a time is supported, but they should be cleaned up
   /// with [destroyIsolate] and recreated with this method there is a hot
   /// restart or full page refresh.
-  Future<void> createIsolate(AppConnection appConnection) async {
+  Future<void> createIsolate(AppConnection appConnection, String? entrypointPath,) async {
     // Inspector is null if the previous isolate is destroyed.
     if (_isIsolateRunning) {
       throw UnsupportedError(
@@ -244,6 +247,7 @@ class ChromeProxyService implements VmServiceInterface {
     // Issue: https://github.com/dart-lang/webdev/issues/1282
     final debugger = await debuggerFuture;
     final entrypoint = appConnection.request.entrypointPath;
+    print('THIS ENTRYPOINT: $entrypoint VS $entrypointPath');
     await _initializeEntrypoint(entrypoint);
 
     debugger.notifyPausedAtStart();
@@ -255,6 +259,7 @@ class ChromeProxyService implements VmServiceInterface {
       root,
       debugger,
       executionContext,
+      entrypointPath,
     );
     debugger.updateInspector(inspector);
 

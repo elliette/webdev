@@ -63,6 +63,10 @@ class AppInspector implements AppInspectorInterface {
   AppConnection get appConnection => _appConnection;
   final AppConnection _appConnection;
 
+  @override
+  String? get entrypointPath => _entrypointPath;
+  final String? _entrypointPath;
+
   final ExecutionContext _executionContext;
 
   late final LibraryHelper _libraryHelper;
@@ -96,6 +100,7 @@ class AppInspector implements AppInspectorInterface {
     this._locations,
     this._root,
     this._executionContext,
+    this._entrypointPath,
   ) : _isolateRef = _toIsolateRef(_isolate);
 
   Future<void> initialize(
@@ -136,6 +141,7 @@ class AppInspector implements AppInspectorInterface {
     String root,
     Debugger debugger,
     ExecutionContext executionContext,
+    String? entrypointPath,
   ) async {
     final id = createId();
     final time = DateTime.now().millisecondsSinceEpoch;
@@ -171,6 +177,7 @@ class AppInspector implements AppInspectorInterface {
       locations,
       root,
       executionContext,
+      entrypointPath,
     );
 
     debugger.updateInspector(inspector);
