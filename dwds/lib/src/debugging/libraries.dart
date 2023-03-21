@@ -29,30 +29,12 @@ class LibraryHelper extends Domain {
   }
 
   Future<LibraryRef> get rootLib async {
-    print('root lib here is $_rootLib');
-    print(StackTrace.current);
-    final entrypointPath = inspector.entrypointPath;
-    var asUri;
-    print('ENTRYPOINT PATH ${inspector.entrypointPath}');
-    if (entrypointPath != null) {
-       asUri = DartUri(entrypointPath);
-      print(asUri);
-    }
-    if (_rootLib != null) return _rootLib!;
     // TODO: read entrypoint from app metadata.
     // Issue: https://github.com/dart-lang/webdev/issues/1290
+    if (_rootLib != null) return _rootLib!;
     final libraries = await libraryRefs;
-    for (var i = 0; i < libraries.length; i++) {
-      final library = libraries[i];
-      final name = library.name ?? '';
-      final uri = library.uri;
-      if (name.contains('main') && uri != null) {
-        final libraryUri = DartUri(uri);
-        print('COMPARING $asUri TO $libraryUri');
-        print('[$i] $name (${library.uri})');        
-      }
-    }
-
+    _rootLib = libraries.firstWhereOrNull(
+        (lib) => Uri.parse(lib.uri ?? '') == inspector.appEntrypoint);
     _rootLib = libraries
         .firstWhereOrNull((lib) => lib.name?.contains('org-dartlang') ?? false);
     _rootLib = _rootLib ??

@@ -21,9 +21,9 @@ abstract class AppInspectorInterface {
   /// Returns the ID for the execution context or null if not found.
   Future<int?> get contextId;
 
-  /// Returns the path to the entrypoint file (usually main.dart), or `null` if
-  /// the file path is unknown.
-  String? get entrypointPath;
+  /// Returns a URI to the entrypoint file (usually main.dart), or `null` if
+  /// the entrypoint is unknown.
+  Uri? get appEntrypoint;
 
   /// Calls Chrome's Runtime.callFunctionOn method.
   ///

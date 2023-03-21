@@ -78,6 +78,7 @@ class PackageUriMapper {
 
   /// Compute resolved file uri for a server path.
   Uri? serverPathToResolvedUri(String serverPath) {
+    print('** RECEIVED $serverPath');
     serverPath = stripLeadingSlashes(serverPath);
     final segments = serverPath.split('/');
     if (segments.first == 'packages') {
@@ -90,6 +91,7 @@ class PackageUriMapper {
       final Package package = packageConfig.packages
           .firstWhere((Package p) => _getRelativeRoot(p.root) == relativeRoot);
       final Uri resolvedUri = package.root.resolve(relativeUrl);
+      print('** RETURN $resolvedUri');
 
       return resolvedUri;
     }

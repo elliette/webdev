@@ -219,7 +219,7 @@ class DebugService {
     bool spawnDds = true,
     bool useSse = false,
     ExpressionCompiler? expressionCompiler,
-    String? entrypointPath,
+    Uri? appEntrypoint,
   }) async {
     final chromeProxyService = await ChromeProxyService.create(
       remoteDebugger,
@@ -229,7 +229,7 @@ class DebugService {
       appConnection,
       executionContext,
       expressionCompiler,
-      entrypointPath,
+      appEntrypoint,
     );
     final authToken = _makeAuthToken();
     final serviceExtensionRegistry = ServiceExtensionRegistry();

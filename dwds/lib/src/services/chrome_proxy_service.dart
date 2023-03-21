@@ -129,7 +129,7 @@ class ChromeProxyService implements VmServiceInterface {
     AppConnection appConnection,
     ExecutionContext executionContext,
     ExpressionCompiler? expressionCompiler,
-    String? entrypointPath,   
+    Uri? appEntrypoint,   
   ) async {
     final vm = VM(
       name: 'ChromeDebugProxy',
@@ -162,7 +162,8 @@ class ChromeProxyService implements VmServiceInterface {
     );
     print('CREATING CHROME PROXY SERIVCE ISOALTE');
     print(StackTrace.current);
-    safeUnawaited(service.createIsolate(appConnection, entrypointPath));
+    safeUnawaited(
+        service.createIsolate(appConnection, appEntrypoint: appEntrypoint));
     return service;
   }
 
@@ -232,7 +233,10 @@ class ChromeProxyService implements VmServiceInterface {
   /// Only one isolate at a time is supported, but they should be cleaned up
   /// with [destroyIsolate] and recreated with this method there is a hot
   /// restart or full page refresh.
-  Future<void> createIsolate(AppConnection appConnection, String? entrypointPath,) async {
+  Future<void> createIsolate(
+    AppConnection appConnection, {
+    Uri? appEntrypoint,
+  }) async {
     // Inspector is null if the previous isolate is destroyed.
     if (_isIsolateRunning) {
       throw UnsupportedError(
@@ -247,7 +251,6 @@ class ChromeProxyService implements VmServiceInterface {
     // Issue: https://github.com/dart-lang/webdev/issues/1282
     final debugger = await debuggerFuture;
     final entrypoint = appConnection.request.entrypointPath;
-    print('THIS ENTRYPOINT: $entrypoint VS $entrypointPath');
     await _initializeEntrypoint(entrypoint);
 
     debugger.notifyPausedAtStart();
@@ -259,7 +262,7 @@ class ChromeProxyService implements VmServiceInterface {
       root,
       debugger,
       executionContext,
-      entrypointPath,
+      appEntrypoint,
     );
     debugger.updateInspector(inspector);
 

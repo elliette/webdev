@@ -71,7 +71,7 @@ class DevHandler {
   final bool _launchDevToolsInNewWindow;
   final ExpressionCompiler? _expressionCompiler;
   final DwdsInjector _injected;
-  final String? _entrypointPath;
+  final Uri? _appEntrypoint;
 
   /// Null until [close] is called.
   ///
@@ -95,7 +95,7 @@ class DevHandler {
     this._injected,
     this._spawnDds,
     this._launchDevToolsInNewWindow,
-    this._entrypointPath,
+    this._appEntrypoint,
   ) {
     _subs.add(buildResults.listen(_emitBuildResults));
     _listen();
@@ -217,7 +217,7 @@ class DevHandler {
       useSse: false,
       expressionCompiler: _expressionCompiler,
       spawnDds: _spawnDds,
-      entrypointPath: _entrypointPath,
+      appEntrypoint: _appEntrypoint,
     );
   }
 
@@ -415,7 +415,10 @@ class DevHandler {
 
       // Reconnect to existing service.
       services.connectedInstanceId = message.instanceId;
-      await services.chromeProxyService.createIsolate(connection, _entrypointPath);
+      await services.chromeProxyService.createIsolate(
+        connection,
+        appEntrypoint: _appEntrypoint,
+      );
     }
     _appConnectionByAppId[message.appId] = connection;
     _connectedApps.add(connection);
@@ -432,7 +435,10 @@ class DevHandler {
       AppConnection appConnection, SocketConnection sseConnection) async {
     await _servicesByAppId[appConnection.request.appId]
         ?.chromeProxyService
-        .createIsolate(appConnection, _entrypointPath);
+        .createIsolate(
+          appConnection,
+          appEntrypoint: _appEntrypoint,
+        );
   }
 
   void _listen() {
@@ -546,7 +552,7 @@ class DevHandler {
         useSse: _useSseForDebugProxy,
         expressionCompiler: _expressionCompiler,
         spawnDds: _spawnDds,
-        entrypointPath: _entrypointPath,
+        appEntrypoint: _appEntrypoint,
       );
       appServices = await _createAppDebugServices(
         devToolsRequest.appId,
