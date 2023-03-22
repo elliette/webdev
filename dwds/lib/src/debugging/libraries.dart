@@ -6,11 +6,10 @@ import 'package:collection/collection.dart';
 import 'package:dwds/src/debugging/metadata/class.dart';
 import 'package:dwds/src/loaders/strategy.dart';
 import 'package:dwds/src/services/chrome_debug_exception.dart';
-import 'package:dwds/src/utilities/dart_uri.dart';
 import 'package:dwds/src/utilities/domain.dart';
 import 'package:logging/logging.dart';
 import 'package:vm_service/vm_service.dart';
-import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart' hide StackTrace;
+import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart';
 
 /// Keeps track of Dart libraries available in the running application.
 class LibraryHelper extends Domain {
@@ -29,12 +28,14 @@ class LibraryHelper extends Domain {
   }
 
   Future<LibraryRef> get rootLib async {
+    if (_rootLib != null) return _rootLib!;
     // TODO: read entrypoint from app metadata.
     // Issue: https://github.com/dart-lang/webdev/issues/1290
-    if (_rootLib != null) return _rootLib!;
     final libraries = await libraryRefs;
-    _rootLib = libraries.firstWhereOrNull(
-        (lib) => Uri.parse(lib.uri ?? '') == inspector.appEntrypoint);
+    if (inspector.appEntrypoint != null) {
+      _rootLib = libraries.firstWhereOrNull(
+          (lib) => Uri.parse(lib.uri ?? '') == inspector.appEntrypoint);
+    }
     _rootLib = libraries
         .firstWhereOrNull((lib) => lib.name?.contains('org-dartlang') ?? false);
     _rootLib = _rootLib ??

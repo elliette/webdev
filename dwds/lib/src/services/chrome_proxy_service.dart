@@ -28,7 +28,7 @@ import 'package:dwds/src/utilities/shared.dart';
 import 'package:logging/logging.dart' hide LogRecord;
 import 'package:pub_semver/pub_semver.dart' as semver;
 import 'package:vm_service/vm_service.dart';
-import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart' hide StackTrace;
+import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart';
 
 /// A proxy from the chrome debug protocol to the dart vm service protocol.
 class ChromeProxyService implements VmServiceInterface {
@@ -129,7 +129,7 @@ class ChromeProxyService implements VmServiceInterface {
     AppConnection appConnection,
     ExecutionContext executionContext,
     ExpressionCompiler? expressionCompiler,
-    Uri? appEntrypoint,   
+    Uri? appEntrypoint,
   ) async {
     final vm = VM(
       name: 'ChromeDebugProxy',
@@ -160,8 +160,6 @@ class ChromeProxyService implements VmServiceInterface {
       executionContext,
       expressionCompiler,
     );
-    print('CREATING CHROME PROXY SERIVCE ISOALTE');
-    print(StackTrace.current);
     safeUnawaited(
         service.createIsolate(appConnection, appEntrypoint: appEntrypoint));
     return service;

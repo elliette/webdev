@@ -76,7 +76,6 @@ void main() {
             final testPackageLib =
                 Uri.file(p.join(testPackageDir, 'lib', 'test_library.dart'));
             final uri = DartUri('$testPackageLib');
-            print('from $uri, compare to $serverPath');
             expect(uri.serverPath, serverPath);
           });
 
