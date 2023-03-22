@@ -75,6 +75,8 @@ class AppInspector implements AppInspectorInterface {
   /// The root URI from which the application is served.
   final String _root;
 
+  final LoadStrategy _loadStrategy;
+
   /// JavaScript expression that evaluates to the Dart stack trace mapper.
   static const stackTraceMapperExpression = '\$dartStackTraceUtility.mapper';
 
@@ -96,6 +98,7 @@ class AppInspector implements AppInspectorInterface {
     this._locations,
     this._root,
     this._executionContext,
+    this._loadStrategy,
   ) : _isolateRef = _toIsolateRef(_isolate);
 
   Future<void> initialize(
@@ -172,6 +175,7 @@ class AppInspector implements AppInspectorInterface {
       locations,
       root,
       executionContext,
+      loadStrategy,
     );
 
     debugger.updateInspector(inspector);
@@ -519,6 +523,7 @@ class AppInspector implements AppInspectorInterface {
   /// All the scripts in the isolate.
   @override
   Future<ScriptList> getScripts() async {
+    print('GETTING SCRIPTS ${(await scriptRefs).first}');
     return ScriptList(scripts: await scriptRefs);
   }
 
@@ -533,24 +538,24 @@ class AppInspector implements AppInspectorInterface {
   /// Returns the list of scripts refs cached.
   Future<List<ScriptRef>> _populateScriptCaches() async {
     return _scriptCacheMemoizer.runOnce(() async {
-      final libraryUris = [
-        for (var library in isolate.libraries ?? []) library.uri
-      ];
       final scripts = await globalLoadStrategy
           .metadataProviderFor(appConnection.request.entrypointPath)
           .scripts;
       // For all the non-dart: libraries, find their parts and create scriptRefs
       // for them.
-      final userLibraries =
-          libraryUris.where((uri) => !uri.startsWith('dart:'));
-      for (var uri in userLibraries) {
+      final userLibraries = _sortLibraries(
+        isolate.libraries ?? [],
+        packageName: _packageName(_loadStrategy.appEntrypoint),
+      );
+      final userScripts = <ScriptRef>[];
+      for (var libraryRef in userLibraries) {
+        final uri = libraryRef.uri;
         final parts = scripts[uri];
         final scriptRefs = [
           ScriptRef(uri: uri, id: createId()),
           for (var part in parts ?? []) ScriptRef(uri: part, id: createId())
         ];
-        final libraryRef = await _libraryHelper.libraryRefFor(uri);
-        final libraryId = libraryRef?.id;
+        final libraryId = libraryRef.id;
         if (libraryId != null) {
           final libraryIdToScriptRefs = _libraryIdToScriptRefs.putIfAbsent(
               libraryId, () => <ScriptRef>[]);
@@ -558,6 +563,7 @@ class AppInspector implements AppInspectorInterface {
             final scriptId = scriptRef.id;
             final scriptUri = scriptRef.uri;
             if (scriptId != null && scriptUri != null) {
+              userScripts.add(scriptRef);
               _scriptRefsById[scriptId] = scriptRef;
               _scriptIdToLibraryId[scriptId] = libraryId;
               _serverPathToScriptRef[DartUri(scriptUri, _root).serverPath] =
@@ -567,8 +573,28 @@ class AppInspector implements AppInspectorInterface {
           }
         }
       }
-      return _scriptRefsById.values.toList();
+      print('FIRST USER SCRIPT ${userScripts.first}');
+      return userScripts;
     });
+  }
+
+  List<LibraryRef> _sortLibraries(List<LibraryRef> libraries,
+      {String? packageName}) {
+    final packageLibraries = [];
+    final nonPackageLibraries = [];
+    for (final ref in libraries) {
+      final uri = ref.uri;
+      if (uri == null) continue;
+      // Skip any Dart libraries:
+      if (_isDartUri(uri)) continue;
+      if (_isPackageUri(Uri.parse(uri), packageName: packageName)) {
+        packageLibraries.add(ref);
+      } else {
+        nonPackageLibraries.add(ref);
+      }
+    }
+    // Show the libraries for the user's package before any other libraries:
+    return [...packageLibraries, ...nonPackageLibraries];
   }
 
   /// Look up the script by id in an isolate.
@@ -627,3 +653,17 @@ class AppInspector implements AppInspectorInterface {
     return message;
   }
 }
+
+/// Returns true if the URI is a Dart URI (starts with "dart:").
+bool _isDartUri(String uri) => Uri.parse(uri).scheme == 'dart';
+
+/// Returns true if the URI is a package URI (starts with "package:"). If
+/// [packageName] is provided, will only return true it the URI is for that
+/// specfic package.
+bool _isPackageUri(Uri uri, {String? packageName}) {
+  final isPackage = uri.scheme == 'package';
+  if (packageName == null) return isPackage;
+  return isPackage && _packageName(uri) == packageName;
+}
+
+String? _packageName(Uri? uri) => uri?.pathSegments.first;
