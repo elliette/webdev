@@ -181,6 +181,8 @@ class Runtime {
 
   external ConnectionHandler get onConnect;
 
+  external ConnectionHandler get onConnectExternal;
+
   external OnMessageHandler get onMessage;
 
   external OnMessageHandler get onMessageExternal;
@@ -203,6 +205,8 @@ class ConnectInfo {
 class Port {
   external String? get name;
   external void disconnect();
+  external void postMessage(Object message);
+  external OnMessageHandler get onMessage;
   external ConnectionHandler get onDisconnect;
 }
 

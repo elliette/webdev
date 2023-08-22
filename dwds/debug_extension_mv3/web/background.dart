@@ -22,6 +22,7 @@ void main() {
 }
 
 void _registerListeners() {
+  debugLog('REGISTERING LISTENERS');
   chrome.runtime.onMessage.addListener(
     allowInterop(_handleRuntimeMessages),
   );
@@ -31,6 +32,12 @@ void _registerListeners() {
   chrome.runtime.onMessageExternal.addListener(
     allowInterop(handleMessagesFromAngularDartDevTools),
   );
+
+  chrome.runtime.onConnect.addListener(allowInterop(_handleOnConnect));
+
+  chrome.runtime.onConnectExternal
+      .addListener(allowInterop(_handleOnConnectExternal));
+
   // Update the extension icon on tab navigation:
   chrome.tabs.onActivated.addListener(
     allowInterop((ActiveInfo info) async {
