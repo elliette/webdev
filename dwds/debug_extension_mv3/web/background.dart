@@ -66,6 +66,16 @@ void _registerListeners() {
   );
 }
 
+void _handleOnConnect(Port port) {
+  print('Received a connection event with ${port.name}');
+  port.postMessage('Received message from ${port.name}!');
+}
+
+void _handleOnConnectExternal(Port port) {
+  print('Received an EXTERNAL connection event with ${port.name}');
+  port.postMessage('Received message from ${port.name}!');
+}
+
 Future<void> _handleRuntimeMessages(
   dynamic jsRequest,
   MessageSender sender,
