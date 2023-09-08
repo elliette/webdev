@@ -96,6 +96,19 @@ class _$DebugInfoSerializer implements StructuredSerializer<DebugInfo> {
         ..add(serializers.serialize(value,
             specifiedType: const FullType(String)));
     }
+    value = object.tabId;
+    if (value != null) {
+      result
+        ..add('tabId')
+        ..add(serializers.serialize(value, specifiedType: const FullType(int)));
+    }
+    value = object.workspaceName;
+    if (value != null) {
+      result
+        ..add('workspaceName')
+        ..add(serializers.serialize(value,
+            specifiedType: const FullType(String)));
+    }
     return result;
   }
 
@@ -154,6 +167,14 @@ class _$DebugInfoSerializer implements StructuredSerializer<DebugInfo> {
           result.tabUrl = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String?;
           break;
+        case 'tabId':
+          result.tabId = serializers.deserialize(value,
+              specifiedType: const FullType(int)) as int?;
+          break;
+        case 'workspaceName':
+          result.workspaceName = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String?;
+          break;
       }
     }
 
@@ -184,6 +205,10 @@ class _$DebugInfo extends DebugInfo {
   final bool? isFlutterApp;
   @override
   final String? tabUrl;
+  @override
+  final int? tabId;
+  @override
+  final String? workspaceName;
 
   factory _$DebugInfo([void Function(DebugInfoBuilder)? updates]) =>
       (new DebugInfoBuilder()..update(updates))._build();
@@ -199,7 +224,9 @@ class _$DebugInfo extends DebugInfo {
       this.extensionUrl,
       this.isInternalBuild,
       this.isFlutterApp,
-      this.tabUrl})
+      this.tabUrl,
+      this.tabId,
+      this.workspaceName})
       : super._();
 
   @override
@@ -223,7 +250,9 @@ class _$DebugInfo extends DebugInfo {
         extensionUrl == other.extensionUrl &&
         isInternalBuild == other.isInternalBuild &&
         isFlutterApp == other.isFlutterApp &&
-        tabUrl == other.tabUrl;
+        tabUrl == other.tabUrl &&
+        tabId == other.tabId &&
+        workspaceName == other.workspaceName;
   }
 
   @override
@@ -240,6 +269,8 @@ class _$DebugInfo extends DebugInfo {
     _$hash = $jc(_$hash, isInternalBuild.hashCode);
     _$hash = $jc(_$hash, isFlutterApp.hashCode);
     _$hash = $jc(_$hash, tabUrl.hashCode);
+    _$hash = $jc(_$hash, tabId.hashCode);
+    _$hash = $jc(_$hash, workspaceName.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -257,7 +288,9 @@ class _$DebugInfo extends DebugInfo {
           ..add('extensionUrl', extensionUrl)
           ..add('isInternalBuild', isInternalBuild)
           ..add('isFlutterApp', isFlutterApp)
-          ..add('tabUrl', tabUrl))
+          ..add('tabUrl', tabUrl)
+          ..add('tabId', tabId)
+          ..add('workspaceName', workspaceName))
         .toString();
   }
 }
@@ -312,6 +345,15 @@ class DebugInfoBuilder implements Builder<DebugInfo, DebugInfoBuilder> {
   String? get tabUrl => _$this._tabUrl;
   set tabUrl(String? tabUrl) => _$this._tabUrl = tabUrl;
 
+  int? _tabId;
+  int? get tabId => _$this._tabId;
+  set tabId(int? tabId) => _$this._tabId = tabId;
+
+  String? _workspaceName;
+  String? get workspaceName => _$this._workspaceName;
+  set workspaceName(String? workspaceName) =>
+      _$this._workspaceName = workspaceName;
+
   DebugInfoBuilder();
 
   DebugInfoBuilder get _$this {
@@ -328,6 +370,8 @@ class DebugInfoBuilder implements Builder<DebugInfo, DebugInfoBuilder> {
       _isInternalBuild = $v.isInternalBuild;
       _isFlutterApp = $v.isFlutterApp;
       _tabUrl = $v.tabUrl;
+      _tabId = $v.tabId;
+      _workspaceName = $v.workspaceName;
       _$v = null;
     }
     return this;
@@ -360,7 +404,9 @@ class DebugInfoBuilder implements Builder<DebugInfo, DebugInfoBuilder> {
             extensionUrl: extensionUrl,
             isInternalBuild: isInternalBuild,
             isFlutterApp: isFlutterApp,
-            tabUrl: tabUrl);
+            tabUrl: tabUrl,
+            tabId: tabId,
+            workspaceName: workspaceName);
     replace(_$result);
     return _$result;
   }

@@ -25,5 +25,6 @@ abstract class DebugInfo implements Built<DebugInfo, DebugInfoBuilder> {
   bool? get isInternalBuild;
   bool? get isFlutterApp;
   String? get tabUrl;
+  int? get tabId;
   String? get workspaceName;
 }

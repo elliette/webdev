@@ -79,6 +79,7 @@ enum TabType {
 
 enum Trigger {
   angularDartDevTools,
+  ciderV,
   extensionPanel,
   extensionIcon,
 }

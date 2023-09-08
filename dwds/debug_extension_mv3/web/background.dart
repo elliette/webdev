@@ -69,11 +69,37 @@ void _registerListeners() {
 void _handleOnConnect(Port port) {
   print('Received a connection event with ${port.name}');
   port.postMessage('Received message from ${port.name}!');
+  _startDebuggingForCiderV(port.name);
 }
 
 void _handleOnConnectExternal(Port port) {
   print('Received an EXTERNAL connection event with ${port.name}');
   port.postMessage('Received message from ${port.name}!');
+  _startDebuggingForCiderV(port.name);
+}
+
+Future<void> _startDebuggingForCiderV(String? portName) async {
+  if (portName == null) return;
+  if (!portName.startsWith('cider-')) return;
+
+  final workspaceName = portName.replaceFirst('cider-', '');
+
+  final tabs = await _findDartTabsForWorkspace(workspaceName);
+
+  if (tabs.isEmpty) return null;
+  if (tabs.length > 1) return null;
+  if (tabs.first == null) return null;
+
+  await attachDebugger(tabs.first!, trigger: Trigger.ciderV);
+}
+
+Future<List<int?>> _findDartTabsForWorkspace(String workspaceName) async {
+  final allTabsInfo =
+      await fetchAllStorageObjects<DebugInfo>(type: StorageObject.debugInfo);
+
+  final tabsInfo = allTabsInfo
+      .where((debugInfo) => debugInfo.workspaceName == workspaceName);
+  return tabsInfo.map((info) => info.tabId).toList();
 }
 
 Future<void> _handleRuntimeMessages(
@@ -122,7 +148,7 @@ Future<void> _handleRuntimeMessages(
       // Save the debug info for the Dart app in storage:
       await setStorageObject<DebugInfo>(
         type: StorageObject.debugInfo,
-        value: _addTabUrl(debugInfo, tabUrl: dartTab.url),
+        value: _addTabInfo(debugInfo, tab: dartTab),
         tabId: dartTab.id,
       );
       // Update the icon to show that a Dart app has been detected:
@@ -200,7 +226,7 @@ bool _isInternalNavigation(NavigationInfo navigationInfo) {
   ].contains(navigationInfo.transitionType);
 }
 
-DebugInfo _addTabUrl(DebugInfo debugInfo, {required String tabUrl}) {
+DebugInfo _addTabInfo(DebugInfo debugInfo, {required Tab tab}) {
   return DebugInfo(
     (b) => b
       ..appEntrypointPath = debugInfo.appEntrypointPath
@@ -212,7 +238,9 @@ DebugInfo _addTabUrl(DebugInfo debugInfo, {required String tabUrl}) {
       ..extensionUrl = debugInfo.extensionUrl
       ..isInternalBuild = debugInfo.isInternalBuild
       ..isFlutterApp = debugInfo.isFlutterApp
-      ..tabUrl = tabUrl,
+    ..workspaceName = debugInfo.workspaceName
+    ..tabUrl = tab.url
+    ..tabId = tab.id
   );
 }
 
