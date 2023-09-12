@@ -17,6 +17,8 @@ import 'messaging.dart';
 import 'storage.dart';
 import 'utils.dart';
 
+Port? _ciderPort;
+
 void main() {
   _registerListeners();
 }
@@ -33,7 +35,7 @@ void _registerListeners() {
     allowInterop(handleMessagesFromAngularDartDevTools),
   );
 
-  chrome.runtime.onConnect.addListener(allowInterop(_handleOnConnect));
+  // chrome.runtime.onConnect.addListener(allowInterop(_handleOnConnect));
 
   chrome.runtime.onConnectExternal
       .addListener(allowInterop(_handleOnConnectExternal));
@@ -66,22 +68,27 @@ void _registerListeners() {
   );
 }
 
-void _handleOnConnect(Port port) {
-  debugLog('Received a connection event with ${port.name}');
-  port.postMessage('Received message from ${port.name}!');
-  _startDebuggingForCiderV(port.name);
-}
+// void _handleOnConnect(Port port) {
+//   debugLog('Received a connection event with ${port.name}');
+//   port.postMessage('Received message from ${port.name}!');
+//   _startDebuggingForCiderV(port.name);
+// }
 
 void _handleOnConnectExternal(Port port) {
   debugLog('Received an EXTERNAL connection event with ${port.name}');
-  port.postMessage('Received message from ${port.name}!');
-  _startDebuggingForCiderV(port.name);
+
+
+  _startDebuggingForCiderV(port);
 }
 
-Future<void> _startDebuggingForCiderV(String? portName) async {
+Future<void> _startDebuggingForCiderV(Port port) async {
+  final portName = port.name;
   if (portName == null) return;
   if (!portName.startsWith('cider-')) return;
 
+  port.postMessage('Received message from ${port.name}!');
+
+  _ciderPort = port;
   final workspaceName = portName.replaceFirst('cider-', '');
 
   final tabs = await _findDartTabsForWorkspace(workspaceName);
@@ -92,11 +99,17 @@ Future<void> _startDebuggingForCiderV(String? portName) async {
   await attachDebugger(tabs.first!, trigger: Trigger.ciderV);
 }
 
+void sendMessageToCider(String message) {
+  if (_ciderPort == null) return;
+  _ciderPort!.postMessage(message);
+}
+
 Future<List<int?>> _findDartTabsForWorkspace(String workspaceName) async {
   final allTabsInfo =
       await fetchAllStorageObjectsOfType<DebugInfo>(
     type: StorageObject.debugInfo,
   );
+  debugLog('RECIEVED $allTabsInfo');
   final tabIds = allTabsInfo
       .where(
         (debugInfo) => debugInfo.workspaceName == workspaceName,
@@ -105,6 +118,7 @@ Future<List<int?>> _findDartTabsForWorkspace(String workspaceName) async {
         (info) => info.tabId,
       )
       .toList();
+  print('RETURNING TAB IDS $tabIds');
   return tabIds;
 }
 

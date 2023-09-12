@@ -115,18 +115,20 @@ Future<List<T>> fetchAllStorageObjectsOfType<T>({required StorageObject type}) {
       }
       final allKeys = List<String>.from(objectKeys(storageContents));
       final storageKeys = allKeys.where((key) => key.contains(type.name));
-      final result = [];
+      final result = <T>[];
       for (final key in storageKeys) {
         final json = getProperty(storageContents, key) as String?;
         if (json != null) {
           if (T == String) {
+            debugLog('adding $json to list');
             result.add(json as T);
           } else {
+            debugLog('adding decoded $json to list');
             result.add(serializers.deserialize(jsonDecode(json)) as T);
           }
         }
       }
-      completer.complete(result as List<T>);
+      completer.complete(result);
     }),
   );
   return completer.future;

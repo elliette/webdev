@@ -21,6 +21,7 @@ import 'package:js/js_util.dart' as js_util;
 import 'package:sse/client/sse_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'background.dart';
 import 'chrome_api.dart';
 import 'cross_extension_communication.dart';
 import 'data_serializers.dart';
@@ -411,6 +412,11 @@ void _routeDwdsEvent(String eventData, SocketClient client, int tabId) {
     if (message.method == 'dwds.devtoolsUri') {
       _maybeOpenDevTools(message.params, dartAppTabId: tabId);
     }
+    if (message.method == 'dwds.plainUri') {
+      debugLog('Received PLAIN URI ${message.params} for Cider!!!!!!');
+      sendMessageToCider(message.params);
+    }
+
     if (message.method == 'dwds.encodedUri') {
       setStorageObject(
         type: StorageObject.encodedUri,
