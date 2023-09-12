@@ -102,7 +102,7 @@ Future<T?> fetchStorageObject<T>({required StorageObject type, int? tabId}) {
   return completer.future;
 }
 
-Future<List<T>> fetchAllStorageObjects<T>({required StorageObject type}) {
+Future<List<T>> fetchAllStorageObjectsOfType<T>({required StorageObject type}) {
   final completer = Completer<List<T>>();
   final storageArea = _getStorageArea(type.persistance);
   storageArea.get(

@@ -409,7 +409,7 @@ void _routeDwdsEvent(String eventData, SocketClient client, int tabId) {
       tabId: tabId,
     );
     if (message.method == 'dwds.devtoolsUri') {
-      _openDevTools(message.params, dartAppTabId: tabId);
+      _maybeOpenDevTools(message.params, dartAppTabId: tabId);
     }
     if (message.method == 'dwds.encodedUri') {
       setStorageObject(
@@ -542,10 +542,16 @@ void _forwardChromeDebuggerEventToDwds(
   }
 }
 
-Future<void> _openDevTools(
+Future<void> _maybeOpenDevTools(
   String devToolsUri, {
   required int dartAppTabId,
 }) async {
+  final trigger = _tabIdToTrigger[dartAppTabId];
+  if (trigger == Trigger.ciderV) {
+    debugLog('Received $devToolsUri for Cider!!!!!!');
+    return;
+  }
+
   if (devToolsUri.isEmpty) {
     debugError('DevTools URI is empty.');
     return;
