@@ -37,6 +37,7 @@ class DwdsInjector {
   final bool _emitDebugEvents;
   final bool _isInternalBuild;
   final Future<bool> Function() _isFlutterApp;
+  final String? _workspaceName;
 
   DwdsInjector(
     this._loadStrategy, {
@@ -46,12 +47,14 @@ class DwdsInjector {
     required bool isInternalBuild,
     required Future<bool> Function() isFlutterApp,
     Future<String>? extensionUri,
+    required String? workspaceName,
   })  : _extensionUri = extensionUri,
         _enableDevtoolsLaunch = enableDevtoolsLaunch,
         _useSseForInjectedClient = useSseForInjectedClient,
         _emitDebugEvents = emitDebugEvents,
         _isInternalBuild = isInternalBuild,
-        _isFlutterApp = isFlutterApp;
+        _isFlutterApp = isFlutterApp,
+        _workspaceName = workspaceName;
 
   /// Returns the embedded dev handler paths.
   ///
@@ -124,6 +127,7 @@ class DwdsInjector {
                 _emitDebugEvents,
                 _isInternalBuild,
                 await _isFlutterApp(),
+                _workspaceName,
               );
               body += await _loadStrategy.bootstrapFor(entrypoint);
               _logger.info('Injected debugging metadata for '
@@ -159,6 +163,7 @@ String _injectClientAndHoistMain(
   bool emitDebugEvents,
   bool isInternalBuild,
   bool isFlutterApp,
+  String? workspaceName,
 ) {
   final bodyLines = body.split('\n');
   final extensionIndex =
@@ -181,6 +186,7 @@ String _injectClientAndHoistMain(
     emitDebugEvents,
     isInternalBuild,
     isFlutterApp,
+    workspaceName,
   );
   result += '''
   // Injected by dwds for debugging support.
@@ -217,6 +223,7 @@ String _injectedClientSnippet(
   bool emitDebugEvents,
   bool isInternalBuild,
   bool isFlutterApp,
+  String? workspaceName,
 ) {
   var injectedBody = 'window.\$dartAppId = "$appId";\n'
       'window.\$dartReloadConfiguration = "${loadStrategy.reloadConfiguration}";\n'
@@ -232,6 +239,9 @@ String _injectedClientSnippet(
       '${loadStrategy.loadClientSnippet(_clientScript)}';
   if (extensionUri != null) {
     injectedBody += 'window.\$dartExtensionUri = "$extensionUri";\n';
+  }
+  if (workspaceName != null) {
+    injectedBody += 'window.\$dartWorkspaceName = "$workspaceName";\n';
   }
   return injectedBody;
 }

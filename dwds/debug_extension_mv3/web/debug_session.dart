@@ -781,6 +781,8 @@ DebuggerLocation? _debuggerLocation(int dartAppTabId) {
       return DebuggerLocation.angularDartDevTools;
     case Trigger.extensionPanel:
       return DebuggerLocation.chromeDevTools;
+    case Trigger.ciderV:
+      return DebuggerLocation.ide;
   }
 }
 

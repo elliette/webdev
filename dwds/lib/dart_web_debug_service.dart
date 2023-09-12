@@ -85,6 +85,7 @@ class Dwds {
     bool emitDebugEvents = true,
     bool isInternalBuild = false,
     Future<bool> Function()? isFlutterApp,
+    String? workspaceName,
   }) async {
     globalLoadStrategy = loadStrategy;
     isFlutterApp ??= () => Future.value(true);
@@ -134,6 +135,7 @@ class Dwds {
       emitDebugEvents: emitDebugEvents,
       isInternalBuild: isInternalBuild,
       isFlutterApp: isFlutterApp,
+      workspaceName: workspaceName,
     );
 
     final devHandler = DevHandler(

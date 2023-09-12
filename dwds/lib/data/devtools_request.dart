@@ -8,6 +8,10 @@ import 'package:built_value/serializer.dart';
 part 'devtools_request.g.dart';
 
 /// A request to open DevTools.
+///
+/// TODO: This class has diverged considerably from its initial purpose to
+/// request that DevTools opens, it also now is used to establish a connection
+/// with an IDE. Rename accordingly.
 abstract class DevToolsRequest
     implements Built<DevToolsRequest, DevToolsRequestBuilder> {
   static Serializer<DevToolsRequest> get serializer =>

@@ -271,7 +271,8 @@ void _launchCommunicationWithDebugExtension() {
           ..authUrl = _authUrl
           ..extensionUrl = _extensionUrl
           ..isInternalBuild = _isInternalBuild
-          ..isFlutterApp = _isFlutterApp,
+          ..isFlutterApp = _isFlutterApp
+          ..workspaceName = _workspaceName,
       ),
     ),
   );
@@ -369,6 +370,8 @@ bool? get _isFlutterApp => _windowContext['\$isFlutterApp'];
 String? get _appId => _windowContext['\$dartAppId'];
 
 String? get _extensionUrl => _windowContext['\$dartExtensionUri'];
+
+String? get _workspaceName => _windowContext['\$dartWorkspaceName'];
 
 String? get _authUrl {
   final extensionUrl = _extensionUrl;
