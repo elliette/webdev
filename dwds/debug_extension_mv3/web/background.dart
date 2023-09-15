@@ -5,6 +5,8 @@
 @JS()
 library background;
 
+import 'dart:convert';
+
 import 'package:dwds/data/debug_info.dart';
 import 'package:js/js.dart';
 
@@ -18,6 +20,7 @@ import 'storage.dart';
 import 'utils.dart';
 
 Port? _ciderPort;
+String? _lastMessageId;
 
 void main() {
   _registerListeners();
@@ -35,7 +38,7 @@ void _registerListeners() {
     allowInterop(handleMessagesFromAngularDartDevTools),
   );
 
-  // chrome.runtime.onConnect.addListener(allowInterop(_handleOnConnect));
+  chrome.runtime.onConnect.addListener(allowInterop(_handleOnConnect));
 
   chrome.runtime.onConnectExternal
       .addListener(allowInterop(_handleOnConnectExternal));
@@ -68,45 +71,85 @@ void _registerListeners() {
   );
 }
 
-// void _handleOnConnect(Port port) {
-//   debugLog('Received a connection event with ${port.name}');
-//   port.postMessage('Received message from ${port.name}!');
-//   _startDebuggingForCiderV(port.name);
-// }
+void _handleOnConnect(Port port) {
+  debugLog('Received an NORMAL connection event with ${port.name}');
+  if (port.name == 'cider') {
+    _connectToCider(port);
+  }
+}
 
 void _handleOnConnectExternal(Port port) {
   debugLog('Received an EXTERNAL connection event with ${port.name}');
-
-
-  _startDebuggingForCiderV(port);
+  if (port.name == 'cider') {
+    _connectToCider(port);
+  }
 }
 
-Future<void> _startDebuggingForCiderV(Port port) async {
-  final portName = port.name;
-  if (portName == null) return;
-  if (!portName.startsWith('cider-')) return;
-
-  port.postMessage('Received message from ${port.name}!');
-
+void _connectToCider(Port port) {
+  debugLog('Received a connect request for Cider!');
   _ciderPort = port;
-  final workspaceName = portName.replaceFirst('cider-', '');
 
-  final tabs = await _findDartTabsForWorkspace(workspaceName);
+  debugLog('registering a listener for cider messages');
+  port.onMessage.addListener(
+    allowInterop(handleMessageFromCider),
+  );
 
-  // TODO: add error here.
-  if (tabs.isEmpty || tabs.length > 1 || tabs.first == null) return null;
-
-  await attachDebugger(tabs.first!, trigger: Trigger.ciderV);
+  // await Future.delayed(Duration(milliseconds: 1500));
+  // debugLog('sending back connected');
+  // sendMessageToCider(messageId: '', messageType: 'connected');
 }
 
-void sendMessageToCider(String message) {
+Future<void> handleMessageFromCider(dynamic message, Port _) async {
+  debugLog('received a message from cider');
+  if (message! is String) {
+    debugWarn(
+        'Expected message from Cider to be a string, instead was ${message}');
+  }
+
+  final decoded = jsonDecode(message as String) as Map<String, dynamic>;
+  final messageId = decoded['messageId'] as String;
+  _lastMessageId = messageId;
+  final messageType = decoded['messageType'] as String;
+  final messageBody = decoded['messageBody'] as String?;
+
+  debugLog('message id is $messageId');
+  debugLog('message type is $messageType');
+  debugLog('message body is $messageBody');
+
+  if (messageType == 'start_debug' && messageBody != null) {
+    final workspaceName = messageBody;
+    // debugLog('send a fake uri back to cider');
+    // sendMessageToCider(
+    //   messageId: messageId,
+    //   messageType: 'start_debug',
+    //   messageBody: 'fake-uri',
+    // );
+
+    final tabs = await _findDartTabsForWorkspace(workspaceName);
+
+    // TODO: add error here.
+    if (tabs.isEmpty || tabs.length > 1 || tabs.first == null) return null;
+
+    await attachDebugger(tabs.first!, trigger: Trigger.ciderV);
+  }
+}
+
+void sendMessageToCider({
+  required String messageType,
+  String? messageBody,
+}) {
   if (_ciderPort == null) return;
+  final message = jsonEncode({
+    'messageId': _lastMessageId ?? '',
+    'messageType': messageType,
+    'messageBody': messageBody,
+  });
+  debugLog('Sending $message');
   _ciderPort!.postMessage(message);
 }
 
 Future<List<int?>> _findDartTabsForWorkspace(String workspaceName) async {
-  final allTabsInfo =
-      await fetchAllStorageObjectsOfType<DebugInfo>(
+  final allTabsInfo = await fetchAllStorageObjectsOfType<DebugInfo>(
     type: StorageObject.debugInfo,
   );
   debugLog('RECIEVED $allTabsInfo');

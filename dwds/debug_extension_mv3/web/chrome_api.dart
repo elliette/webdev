@@ -206,8 +206,16 @@ class Port {
   external String? get name;
   external void disconnect();
   external void postMessage(Object message);
-  external OnMessageHandler get onMessage;
+  external OnPortMessageHandler get onMessage;
   external ConnectionHandler get onDisconnect;
+}
+
+@JS()
+@anonymous
+class OnPortMessageHandler {
+  external void addListener(
+    void Function(dynamic, Port) callback,
+  );
 }
 
 @JS()
