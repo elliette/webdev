@@ -247,6 +247,7 @@ class Debugger extends Domain {
     int line, {
     int? column,
   }) async {
+    print('adding breakpoint at line$line');
     column ??= 0;
     final breakpoint = await _breakpoints.add(scriptId, line, column);
     _notifyBreakpoint(breakpoint);
@@ -265,20 +266,26 @@ class Debugger extends Domain {
     Set<Breakpoint> previousBreakpoints,
     Set<Breakpoint> disabledBreakpoints,
   ) async {
+    print('RE-ESTABLISHING BREAKPOINTS: ${_stringifyBps(previousBreakpoints)}');
     // Previous breakpoints were never removed from Chrome since we use
     // `setBreakpointByUrl`. We simply need to update the references.
-    for (var breakpoint in previousBreakpoints) {
+    for (var breakpoint in disabledBreakpoints) {
       final dartBpId = breakpoint.id!;
       final scriptRef = await _updatedScriptRefFor(breakpoint);
       final scriptUri = scriptRef?.uri;
       if (scriptRef != null && scriptUri != null) {
-        final jsBpId = _breakpoints.jsIdFor(dartBpId)!;
+        print('in here 1');
+        final jsBpId = _breakpoints.jsIdFor(dartBpId) ?? 'unknown';
         final updatedLocation = await _locations.locationForDart(
           DartUri(scriptUri, _root),
           _lineNumberFor(breakpoint),
           _columnNumberFor(breakpoint),
         );
+        print('updated location $updatedLocation');
         if (updatedLocation != null) {
+          print(
+            'updating debugger of new bp location for $dartBpId: line ${updatedLocation.dartLocation.line}',
+          );
           final updatedBreakpoint = _breakpoints._dartBreakpoint(
             scriptRef,
             updatedLocation,
@@ -287,11 +294,11 @@ class Debugger extends Domain {
           _breakpoints._note(bp: updatedBreakpoint, jsId: jsBpId);
           _notifyBreakpoint(updatedBreakpoint);
         } else {
-          logger.warning('Cannot update breakpoint $dartBpId:'
+          print('Cannot update breakpoint $dartBpId:'
               ' cannot update location.');
         }
       } else {
-        logger.warning('Cannot update breakpoint $dartBpId:'
+        print('Cannot update breakpoint $dartBpId:'
             ' cannot find script ref.');
       }
     }
@@ -302,6 +309,7 @@ class Debugger extends Domain {
       final scriptRef = await _updatedScriptRefFor(breakpoint);
       final scriptId = scriptRef?.id;
       if (scriptId != null) {
+        print('simply adding back disabled breakpoint');
         await addBreakpoint(
           scriptId,
           _lineNumberFor(breakpoint),
@@ -312,6 +320,12 @@ class Debugger extends Domain {
             ' cannot find script ref.');
       }
     }
+  }
+
+  String _stringifyBps(Set<Breakpoint> breakpoints) {
+    return breakpoints
+        .map((bp) => '${bp.id}@line${bp.location.line ?? '?'}')
+        .join(' ');
   }
 
   void _notifyBreakpoint(Breakpoint breakpoint) {
@@ -326,6 +340,7 @@ class Debugger extends Domain {
 
   /// Remove a Dart breakpoint.
   Future<Success> removeBreakpoint(String breakpointId) async {
+    print('removing breakpoint $breakpointId');
     if (_breakpoints.breakpointFor(breakpointId) == null) {
       throwInvalidParam(
         'removeBreakpoint',
@@ -344,6 +359,7 @@ class Debugger extends Domain {
 
     final bp = await _breakpoints.remove(jsId: jsId, dartId: breakpointId);
     if (bp != null) {
+      print('successfully removed breakpoint! $breakpointId');
       _streamNotify(
         'Debug',
         Event(
