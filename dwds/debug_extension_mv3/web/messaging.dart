@@ -30,6 +30,7 @@ enum MessageType {
   debugInfo,
   debugStateChange,
   devToolsUrl,
+  infoRequest,
   multipleAppsDetected;
 
   factory MessageType.fromString(String value) {

@@ -160,12 +160,16 @@ Future<void> _handleRuntimeMessages(
 Future<void> _detectNavigationAwayFromDartApp(
   NavigationInfo navigationInfo,
 ) async {
-  // Ignore any navigation events within the page itself (e.g., opening a link,
-  // reloading the page, reloading an IFRAME, etc):
-  if (_isInternalNavigation(navigationInfo)) return;
   final tabId = navigationInfo.tabId;
   final debugInfo = await _fetchDebugInfo(navigationInfo.tabId);
   if (debugInfo == null) return;
+  if (_isInternalNavigation(navigationInfo)) {
+    await _sendMessageToDetectorScript(
+      type: MessageType.infoRequest,
+      body: debugInfo.appOrigin ?? '',
+    );
+  }
+
   if (debugInfo.tabUrl != navigationInfo.url) {
     _setDefaultIcon();
     await clearStaleDebugSession(tabId);
@@ -243,4 +247,16 @@ Future<DebugInfo?> _fetchDebugInfo(int tabId) {
 Future<bool> _matchesAppInStorage(String? appId, {required int tabId}) async {
   final debugInfo = await _fetchDebugInfo(tabId);
   return appId != null && appId == debugInfo?.appId;
+}
+
+Future<void> _sendMessageToDetectorScript({
+  required MessageType type,
+  required String body,
+}) async {
+  await sendRuntimeMessage(
+    type: type,
+    body: body,
+    sender: Script.background,
+    recipient: Script.detector,
+  );
 }

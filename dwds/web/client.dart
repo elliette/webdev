@@ -256,27 +256,26 @@ void _launchCommunicationWithDebugExtension() {
   // Listen for an event from the Dart Debug Extension to authenticate the
   // user (sent once the extension receives the dart-app-read event):
   _listenForDebugExtensionAuthRequest();
+  _listenForDebugExtensionInfoRequest();
 
   // Send the dart-app-ready event along with debug info to the Dart Debug
   // Extension so that it can debug the Dart app:
-  final debugInfoJson = jsonEncode(
-    serializers.serialize(
-      DebugInfo(
-        (b) => b
-          ..appEntrypointPath = dartEntrypointPath
-          ..appId = _appId
-          ..appInstanceId = dartAppInstanceId
-          ..appOrigin = window.location.origin
-          ..appUrl = window.location.href
-          ..authUrl = _authUrl
-          ..extensionUrl = _extensionUrl
-          ..isInternalBuild = _isInternalBuild
-          ..isFlutterApp = _isFlutterApp
-          ..workspaceName = dartWorkspaceName,
-      ),
-    ),
+  dispatchEvent(CustomEvent('dart-app-ready', detail: _debugInfoJson));
+}
+
+void _listenForDebugExtensionInfoRequest() {
+  window.addEventListener(
+    'message',
+    allowInterop((event) async {
+      final messageEvent = event as MessageEvent;
+      if (messageEvent.data is! String) return;
+      if (messageEvent.data as String != 'dart-debug-info-request') return;
+
+      dispatchEvent(
+        CustomEvent('dart-debug-info-response', detail: _debugInfoJson),
+      );
+    }),
   );
-  dispatchEvent(CustomEvent('dart-app-ready', detail: debugInfoJson));
 }
 
 void _listenForDebugExtensionAuthRequest() {
@@ -297,6 +296,24 @@ void _listenForDebugExtensionAuthRequest() {
     }),
   );
 }
+
+String get _debugInfoJson => jsonEncode(
+      serializers.serialize(
+        DebugInfo(
+          (b) => b
+            ..appEntrypointPath = dartEntrypointPath
+            ..appId = _appId
+            ..appInstanceId = dartAppInstanceId
+            ..appOrigin = window.location.origin
+            ..appUrl = window.location.href
+            ..authUrl = _authUrl
+            ..extensionUrl = _extensionUrl
+            ..isInternalBuild = _isInternalBuild
+            ..isFlutterApp = _isFlutterApp
+            ..workspaceName = dartWorkspaceName,
+        ),
+      ),
+    );
 
 Future<bool> _authenticateUser(String authUrl) async {
   final response = await HttpRequest.request(

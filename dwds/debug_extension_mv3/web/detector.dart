@@ -2,6 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+// wip - might make sense to instead detect reload events, and save in memory
+// the app origins we expect to get back (and if we don't, to remove them).
 @JS()
 library detector;
 
@@ -24,8 +26,29 @@ void main() {
 }
 
 void _registerListeners() {
+  chrome.runtime.onMessage.addListener(
+    allowInterop(_handleRuntimeMessages),
+  );
   document.addEventListener('dart-app-ready', _onDartAppReadyEvent);
   document.addEventListener('dart-auth-response', _onDartAuthEvent);
+  document.addEventListener('dart-debug-info-response', _onDartDebugInfoEvent);
+}
+
+Future<void> _handleRuntimeMessages(
+  dynamic jsRequest,
+  MessageSender sender,
+  // ignore: avoid-unused-parameters
+  Function sendResponse,
+) async {
+  if (jsRequest is! String) return;
+
+  interceptMessage<String>(
+    message: jsRequest,
+    expectedType: MessageType.infoRequest,
+    expectedSender: Script.background,
+    expectedRecipient: Script.detector,
+    messageHandler: _sendDebugInfoRequest,
+  );
 }
 
 Future<void> _onDartAppReadyEvent(Event event) async {
@@ -52,6 +75,20 @@ Future<void> _onDartAuthEvent(Event event) async {
     type: MessageType.isAuthenticated,
     body: isAuthenticated,
   );
+}
+
+Future<void> _onDartDebugInfoEvent(Event event) async {
+  final debugInfo = getProperty(event, 'detail') as String?;
+  if (debugInfo == null) {
+    debugWarn(
+      'No debug info sent with with dart debug info response.',
+    );
+  } else {
+    await _sendMessageToBackgroundScript(
+      type: MessageType.debugInfo,
+      body: debugInfo,
+    );
+  }
 }
 
 void _detectMultipleDartApps() {
@@ -129,4 +166,8 @@ void _sendAuthRequest(String debugInfoJson) {
   if (appOrigin != null) {
     window.postMessage('dart-auth-request', appOrigin);
   }
+}
+
+void _sendDebugInfoRequest(String appOrigin) {
+  window.postMessage('dart-debug-info-request', appOrigin);
 }
