@@ -10,6 +10,7 @@ import 'dart:html';
 import 'package:js/js.dart';
 
 import 'chrome_api.dart';
+import 'logger.dart';
 import 'messaging.dart';
 
 void main() {
@@ -39,7 +40,9 @@ void _handleRuntimeMessages(
 }
 
 void _copyAppId(String appId) {
+  debugLog('received copy request, clipboard:');
   final clipboard = window.navigator.clipboard;
+  debugLog('clipboard is $clipboard');
   if (clipboard == null) return;
   clipboard.writeText(appId);
   _showCopiedMessage(appId);

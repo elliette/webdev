@@ -49,11 +49,18 @@ Port? _ciderPort;
 /// The only site allowed to connect with this extension is Cider. The allowed
 /// URIs for Cider are set in the externally_connectable field in the manifest.
 void handleCiderConnectRequest(Port port) {
+  debugLog('==== Received a connection request from Cider: ${port.name}');
   if (port.name == _ciderPortName) {
     _ciderPort = port;
 
     port.onMessage.addListener(
       allowInterop(_handleMessageFromCider),
+    );
+
+    port.onDisconnect.addListener(
+      allowInterop((Port port) {
+        debugLog('DISCONNECTED: ${port.name}');
+      }),
     );
   }
 }
@@ -97,6 +104,7 @@ void _sendMessageToCider(String json) {
 Future<void> _handleMessageFromCider(dynamic message, Port _) async {
   final key = getProperty(message, 'key');
   final json = getProperty(message, 'json');
+  debugLog('Handling message from cider: $json');
   if (key != _ciderDartMessageKey || json is! String) {
     sendErrorMessageToCider(
       errorType: CiderErrorType.invalidRequest,

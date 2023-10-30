@@ -218,6 +218,7 @@ Future<bool> _maybeSendCopyAppIdRequest(String command, [Tab? tab]) async {
   final workspaceName = debugInfo?.workspaceName;
   if (workspaceName == null) return false;
   final appId = '$workspaceName-$tabId';
+  debugLog('sending tabs messagee');
   return sendTabsMessage(
     tabId: tabId,
     type: MessageType.appId,
