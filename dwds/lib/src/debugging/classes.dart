@@ -60,6 +60,8 @@ class ClassHelper extends Domain {
     final classRef = classRefFor(libraryId, splitId.last);
     clazz = await _constructClass(libraryRef, classRef);
     if (clazz == null) {
+      print(
+          'Throwing exception because could not construct class for $classRef');
       throw Exception('Could not construct class: $classRef');
     }
     return _classes[objectId] = clazz;
@@ -94,6 +96,10 @@ class ClassHelper extends Domain {
       );
     } on ExceptionDetails catch (e) {
       throw ChromeDebugException(e.json, evalContents: expression);
+    }
+
+    if (result.value == null) {
+      return null;
     }
 
     final classDescriptor = _mapify(result.value);

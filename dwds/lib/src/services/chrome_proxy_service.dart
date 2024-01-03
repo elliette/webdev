@@ -619,6 +619,7 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
           _checkIsolate('evaluate', isolateId);
 
           final library = await inspector.getLibrary(targetId);
+          print('LIBRARY IS $library');
           return await _getEvaluationResult(
             isolateId,
             () => evaluator.evaluateExpression(
