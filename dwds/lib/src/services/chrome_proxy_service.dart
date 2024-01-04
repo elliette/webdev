@@ -617,9 +617,15 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
         if (evaluator != null) {
           await isCompilerInitialized;
           _checkIsolate('evaluate', isolateId);
-
-          final library = await inspector.getLibrary(targetId);
-          print('LIBRARY IS $library');
+          final libraryId = await inspector.getLibraryIdFor(targetId);
+          if (libraryId == null) {
+            throw RPCError(
+              'evaluate',
+              RPCErrorKind.kInternalError.code,
+              'Could not determine a library ID for $expression.',
+            );
+          }
+          final library = await inspector.getLibrary(libraryId);
           return await _getEvaluationResult(
             isolateId,
             () => evaluator.evaluateExpression(
@@ -632,7 +638,7 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
           );
         }
         throw RPCError(
-          'evaluateInFrame',
+          'evaluate',
           RPCErrorKind.kInvalidRequest.code,
           'Expression evaluation is not supported for this configuration.',
         );

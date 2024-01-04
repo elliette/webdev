@@ -45,19 +45,18 @@ class ClassHelper extends Domain {
   ///
   /// If a corresponding class does not exist it will return null.
   Future<Class?> forObjectId(String objectId) async {
-    if (!objectId.startsWith('classes|')) return null;
+    if (!isClassId(objectId)) return null;
     var clazz = _classes[objectId];
     if (clazz != null) return clazz;
-    final splitId = objectId.split('|');
-    final libraryId = splitId[1];
-    if (libraryId == 'null') {
+    final libraryId = libraryIdForClass(objectId);
+    if (libraryId == null || libraryId == 'null') {
       throw UnsupportedError('unknown library: $libraryId');
     }
     final libraryRef = await inspector.libraryRefFor(libraryId);
     if (libraryRef == null) {
       throw Exception('Could not find library: $libraryId');
     }
-    final classRef = classRefFor(libraryId, splitId.last);
+    final classRef = classRefFor(libraryId, _dartNameForClass(objectId));
     clazz = await _constructClass(libraryRef, classRef);
     if (clazz == null) {
       print(
@@ -65,6 +64,20 @@ class ClassHelper extends Domain {
       throw Exception('Could not construct class: $classRef');
     }
     return _classes[objectId] = clazz;
+  }
+
+  bool isClassId(String objectId) => objectId.startsWith('classes|');
+
+  String? libraryIdForClass(String objectId) {
+    if (!isClassId(objectId)) return null;
+    final splitId = objectId.split('|');
+    return splitId[1];
+  }
+
+  String? _dartNameForClass(String objectId) {
+    if (!isClassId(objectId)) return null;
+    final splitId = objectId.split('|');
+    return splitId.last;
   }
 
   /// Constructs a [Class] instance for the provided [LibraryRef] and

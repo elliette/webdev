@@ -387,14 +387,26 @@ class AppInspector implements AppInspectorInterface {
   Future<Library?> getLibrary(String objectId) async {
     final libraryRef = await libraryRefFor(objectId);
     if (libraryRef == null) {
-      // print('======================================');
-      print('COULD NOT FIND LIBRARY REF FOR $objectId');
-      // print('Known refs are:');
-      // final refs = await _libraryHelper.libraryRefs;
-      // refs.forEach((ref) => print('${ref.id} -> ${ref.name}'));
       return null;
     }
     return _libraryHelper.libraryFor(libraryRef);
+  }
+
+  Future<String?> getLibraryIdFor(String objectId) async {
+    final isLibraryId = await isLibrary(objectId);
+    if (isLibraryId) return objectId;
+
+    final isClass = _classHelper.isClassId(objectId);
+    if (isClass) return _classHelper.libraryIdForClass(objectId);
+
+    final instance =
+        await _instanceHelper.instanceFor(remoteObjectFor(objectId));
+    return instance?.classRef?.library?.id;
+  }
+
+  Future<bool> isLibrary(String objectId) async {
+    final libraryRef = await libraryRefFor(objectId);
+    return libraryRef != null;
   }
 
   @override
