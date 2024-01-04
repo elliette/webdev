@@ -24,8 +24,7 @@ import 'package:dwds/src/utilities/server.dart';
 import 'package:dwds/src/utilities/shared.dart';
 import 'package:logging/logging.dart';
 import 'package:vm_service/vm_service.dart';
-import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart'
-    hide StackTrace;
+import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart';
 
 /// An inspector for a running Dart application contained in the
 /// [WipConnection].
@@ -386,9 +385,8 @@ class AppInspector implements AppInspectorInterface {
   @override
   Future<Library?> getLibrary(String objectId) async {
     final libraryRef = await libraryRefFor(objectId);
-    if (libraryRef == null) {
-      return null;
-    }
+    if (libraryRef == null) return null;
+
     return _libraryHelper.libraryFor(libraryRef);
   }
 
@@ -430,8 +428,6 @@ class AppInspector implements AppInspectorInterface {
         return instance;
       }
     } catch (e, s) {
-      print('Throwing exception that getObject failed');
-      print(StackTrace.current);
       _logger.fine('getObject $objectId failed', e, s);
       rethrow;
     }

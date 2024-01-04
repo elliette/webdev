@@ -80,23 +80,19 @@ class BatchedExpressionEvaluator extends ExpressionEvaluator {
       libraryUri ??= request.libraryUri;
       isolateId ??= request.isolateId;
       scope ??= request.scope;
-      print('Evaluating batch request:');
-      print('   library URIL $libraryUri');
-      print('   isolate ID: $isolateId');
-      print('   scope: $scope');
 
       if (libraryUri != request.libraryUri ||
           isolateId != request.isolateId ||
           !MapEquality().equals(scope, request.scope)) {
-        print('NEW BATCH DUE TO');
+        _logger.fine('New batch due to');
         if (libraryUri != request.libraryUri) {
-          print(' - library uri: $libraryUri != ${request.libraryUri}');
+          _logger.fine(' - library uri: $libraryUri != ${request.libraryUri}');
         }
         if (isolateId != request.isolateId) {
-          print(' - isolateId: $isolateId != ${request.isolateId}');
+          _logger.fine(' - isolateId: $isolateId != ${request.isolateId}');
         }
         if (!MapEquality().equals(scope, request.scope)) {
-          print(' - scope: $scope != ${request.scope}');
+          _logger.fine(' - scope: $scope != ${request.scope}');
         }
 
         safeUnawaited(_evaluateBatch(currentRequests));

@@ -59,24 +59,24 @@ class ClassHelper extends Domain {
     final classRef = classRefFor(libraryId, _dartNameForClass(objectId));
     clazz = await _constructClass(libraryRef, classRef);
     if (clazz == null) {
-      print(
-          'Throwing exception because could not construct class for $classRef');
       throw Exception('Could not construct class: $classRef');
     }
     return _classes[objectId] = clazz;
   }
 
+  /// Checks whether the given [objectId] is the ID of a class.
   bool isClassId(String objectId) => objectId.startsWith('classes|');
 
-  String? libraryIdForClass(String objectId) {
-    if (!isClassId(objectId)) return null;
-    final splitId = objectId.split('|');
+  /// Returns the library ID for a class given the [classId].
+  String? libraryIdForClass(String classId) {
+    if (!isClassId(classId)) return null;
+    final splitId = classId.split('|');
     return splitId[1];
   }
 
-  String? _dartNameForClass(String objectId) {
-    if (!isClassId(objectId)) return null;
-    final splitId = objectId.split('|');
+  String? _dartNameForClass(String classId) {
+    if (!isClassId(classId)) return null;
+    final splitId = classId.split('|');
     return splitId.last;
   }
 
@@ -109,10 +109,6 @@ class ClassHelper extends Domain {
       );
     } on ExceptionDetails catch (e) {
       throw ChromeDebugException(e.json, evalContents: expression);
-    }
-
-    if (result.value == null) {
-      return null;
     }
 
     final classDescriptor = _mapify(result.value);

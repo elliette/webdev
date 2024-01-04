@@ -37,7 +37,6 @@ Future<T> wrapInErrorHandlerAsync<T>(
 ) {
   return asyncCallback().catchError(
     (error) {
-      print('Returning an RPC error: $error');
       return Future<T>.error(
         RPCError(
           command,
