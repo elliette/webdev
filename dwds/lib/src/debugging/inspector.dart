@@ -386,13 +386,12 @@ class AppInspector implements AppInspectorInterface {
   Future<Library?> getLibrary(String objectId) async {
     final libraryRef = await libraryRefFor(objectId);
     if (libraryRef == null) return null;
-
     return _libraryHelper.libraryFor(libraryRef);
   }
 
+  @override
   Future<String?> getLibraryIdFor(String objectId) async {
-    final isLibraryId = await isLibrary(objectId);
-    if (isLibraryId) return objectId;
+    if (isLibraryId(objectId)) return objectId;
 
     final isClass = _classHelper.isClassId(objectId);
     if (isClass) return _classHelper.libraryIdForClass(objectId);
@@ -400,11 +399,6 @@ class AppInspector implements AppInspectorInterface {
     final instance =
         await _instanceHelper.instanceFor(remoteObjectFor(objectId));
     return instance?.classRef?.library?.id;
-  }
-
-  Future<bool> isLibrary(String objectId) async {
-    final libraryRef = await libraryRefFor(objectId);
-    return libraryRef != null;
   }
 
   @override

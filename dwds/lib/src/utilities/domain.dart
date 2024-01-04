@@ -45,6 +45,9 @@ abstract class AppInspectorInterface {
   /// Returns the [Library] for the provided Dart [objectId].
   Future<Library?> getLibrary(String objectId);
 
+  /// Returns the library ID associated with the provided Dart [objectId].
+  Future<String?> getLibraryIdFor(String objectId);
+
   /// Returns the [ScriptRef]s in the library with [libraryId].
   Future<List<ScriptRef>> scriptRefsForLibrary(String libraryId);
 
