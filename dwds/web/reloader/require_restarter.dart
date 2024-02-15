@@ -102,7 +102,11 @@ class RequireRestarter implements Restarter {
   }
 
   @override
-  Future<bool> restart({String? runId}) async {
+  Future<bool> restart({
+    String? runId,
+    bool shouldPauseOnStart = false,
+  }) async {
+    print('CALLING REQUIRE RESTARTER, SHOULD PAUSE? $shouldPauseOnStart');
     final developer = getProperty(require('dart_sdk'), 'developer');
     if (callMethod(
       getProperty(developer, '_extensions'),
@@ -137,7 +141,10 @@ class RequireRestarter implements Restarter {
       result = await _reload(modulesToLoad);
     }
     callMethod(getProperty(require('dart_sdk'), 'dart'), 'hotRestart', []);
-    runMain();
+    if (!shouldPauseOnStart) {
+      print('RUNNING MAIN FROM REQUIRE RESTARTER!!!');
+      runMain();
+    }
     return result;
   }
 

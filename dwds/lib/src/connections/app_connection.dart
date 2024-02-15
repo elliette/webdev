@@ -31,10 +31,13 @@ class AppConnection {
   Future<void> get onDone => _doneCompleter.future;
 
   void runMain() {
+    print('RUN MAIN!!!!');
     if (_startedCompleter.isCompleted) {
       throw StateError('Main has already started.');
     }
+    print('enqueuing run request...');
     _connection.sink.add(jsonEncode(serializers.serialize(RunRequest())));
     _startedCompleter.complete();
+    print('_started completer is complete');
   }
 }

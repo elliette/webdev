@@ -10,7 +10,11 @@ import 'restarter.dart';
 
 class DdcRestarter implements Restarter {
   @override
-  Future<bool> restart({String? runId}) async {
+  Future<bool> restart({
+    String? runId,
+    bool shouldPauseOnStart = false,
+  }) async {
+    print('CALLING RESTART FROM DDC RESTARTER!!!');
     final dartLibrary = context['dart_library'] as JsObject;
     if (runId == null) {
       dartLibrary.callMethod('reload');

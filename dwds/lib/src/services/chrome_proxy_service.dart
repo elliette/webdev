@@ -93,6 +93,9 @@ class ChromeProxyService implements VmServiceInterface {
 
   final _pauseIsolatesOnStartController = StreamController<bool>.broadcast();
 
+  bool get shouldPauseIsolatesOnStart => _shouldPauseIsolatesOnStart;
+  bool _shouldPauseIsolatesOnStart = false;
+
   /// A global stream of the value of the [_pauseIsolatesOnStartFlag].
   ///
   /// The flag's value can be updated during runtime.
@@ -167,6 +170,7 @@ class ChromeProxyService implements VmServiceInterface {
       executionContext,
       expressionCompiler,
     );
+    print('CREATING THE ISOLATE');
     safeUnawaited(service.createIsolate(appConnection));
     return service;
   }
@@ -254,6 +258,7 @@ class ChromeProxyService implements VmServiceInterface {
   /// restart or full page refresh.
   Future<void> createIsolate(AppConnection appConnection) async {
     // Inspector is null if the previous isolate is destroyed.
+    print('creating isolate');
     if (_isIsolateRunning) {
       throw UnsupportedError(
         'Cannot create multiple isolates for the same app',
@@ -303,6 +308,7 @@ class ChromeProxyService implements VmServiceInterface {
 
     safeUnawaited(
       appConnection.onStart.then((_) {
+        print('received app connection on start');
         debugger.resumeFromStart();
         _startedCompleter.complete();
       }),
@@ -1146,6 +1152,7 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
     String? step,
     int? frameIndex,
   }) async {
+    print('PROCESSING A RESUME REQUEST');
     if (inspector.appConnection.isStarted) {
       return captureElapsedTime(
         () async {
@@ -1158,6 +1165,7 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
         (result) => DwdsEvent.resume(step),
       );
     } else {
+      print('run main!');
       inspector.appConnection.runMain();
       return Success();
     }
@@ -1215,7 +1223,9 @@ ${globalToolConfiguration.loadStrategy.loadModuleSnippet}("dart_sdk").developer.
 
     if (name == _pauseIsolatesOnStartFlag) {
       assert(value == 'true' || value == 'false');
-      _pauseIsolatesOnStartController.sink.add(value == 'true');
+      final shouldPause = value == 'true';
+      _pauseIsolatesOnStartController.sink.add(shouldPause);
+      _shouldPauseIsolatesOnStart = shouldPause;
     }
 
     return Success();

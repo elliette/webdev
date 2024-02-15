@@ -231,6 +231,7 @@ class DebugService {
     ExpressionCompiler? expressionCompiler,
   }) async {
     final root = assetReader.basePath;
+    print('create chrome proxy service');
     final chromeProxyService = await ChromeProxyService.create(
       remoteDebugger,
       root,
